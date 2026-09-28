@@ -48,5 +48,11 @@ test("the landing page leads into the demo, and the shots all load", async ({ pa
 
   // The finding from user testing was that people did not realise the page continued, so the cue
   // has to be reachable without scrolling first.
-  await expect(page.getByRole("link", { name: /see what it does/i })).toBeInViewport();
+  const cue = page.getByRole("link", { name: /see what it does/i });
+  await expect(cue).toBeInViewport();
+
+  // The suite runs as a phone, where the hero stacks: the welcome screenshot sits directly under
+  // the cue. A plain jump to the features used to skip it, so the cue must stop on it instead.
+  await cue.click();
+  await expect(page.locator("#hero-shot")).toBeInViewport({ ratio: 0.95 });
 });

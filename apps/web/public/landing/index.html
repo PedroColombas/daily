@@ -25,6 +25,7 @@
   a:hover{color:#9c3f20;}
   .shot{width:100%;height:100%;object-fit:cover;display:block;}
   .more:hover{color:#1c1a17;}
+  @media (prefers-reduced-motion:no-preference){ html{scroll-behavior:smooth;} }
   .more__mark{animation:nudge 2.8s ease-in-out infinite;}
   .more:hover .more__mark{animation-play-state:paused;}
   @keyframes nudge{ 0%,74%,100%{transform:translateY(0);} 86%{transform:translateY(3px);} }
@@ -70,7 +71,7 @@
           <svg class="more__mark" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#c0512b" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
         </a>
       </div>
-      <div class="phone" style="justify-self:end;min-width:0;">
+      <div class="phone" id="hero-shot" style="justify-self:end;min-width:0;">
         <div style="width:min(300px,78vw);aspect-ratio:320/688;background:#0e0e10;border-radius:46px;padding:10px;box-shadow:0 34px 64px -20px rgba(45,32,20,.45),0 8px 18px rgba(0,0,0,.14);">
           <div style="position:relative;width:100%;height:100%;border-radius:37px;overflow:hidden;background:#f1ece3;">
             <img class="shot" src="/landing/wizard-0-welcome.png" alt="The welcome screen">
@@ -183,5 +184,21 @@
 
   </div>
 </div>
+<script>
+  (function () {
+    var cue = document.querySelector("a.more");
+    var shot = document.getElementById("hero-shot");
+    var features = document.getElementById("features");
+    if (!cue || !shot || !features) return;
+    cue.addEventListener("click", function (e) {
+      e.preventDefault();
+      var reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      var behavior = reduce ? "auto" : "smooth";
+      var stacked = shot.getBoundingClientRect().top >= cue.getBoundingClientRect().bottom;
+      if (stacked) shot.scrollIntoView({ behavior: behavior, block: "center" });
+      else features.scrollIntoView({ behavior: behavior, block: "start" });
+    });
+  })();
+</script>
 </body>
 </html>
