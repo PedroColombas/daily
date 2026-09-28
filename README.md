@@ -78,12 +78,18 @@ ffmpeg into one episode with a branded intro and per-topic chapters.
 
 ## Not built yet
 
-- Reader-chosen sources per topic. Interesting design work, deliberately deferred.
-- Subscription billing. The unit economics are modelled; the checkout is not.
-- Push notifications when a brief lands.
-- A native iOS wrapper. The PWA installs to the home screen today.
-- The weekday cron is currently switched off. Generation is on-demand only, to keep a public demo
-  from costing money in the background.
+- **Source preferences** — choose which outlets each topic draws on, to favour trusted sources or
+  exclude particular ones.
+- **Multilingual briefs** — reports and podcast narration in the reader's chosen language, with an
+  interface to match.
+- **Paid plans** — subscription tiers with billing and account management. Pricing and per-reader
+  running costs have been modelled; payments are not implemented.
+- **Notifications** — a push notification when the day's brief is ready.
+- **Native iOS app** — an App Store build of the existing app. It can already be installed to the
+  home screen as a web app.
+
+Automatic weekday delivery is built but currently switched off, so the public demo does not incur
+API costs in the background. Briefs are generated on demand in the meantime.
 
 ---
 
