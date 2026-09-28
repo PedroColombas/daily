@@ -223,7 +223,7 @@ framing before they need the product.
       * an honest roadmap of what is not built yet
 * [x] Light tidy only: dead code, naming, folder coherence. **No refactors.**
       Legible and honestly described beats immaculate.
-* [x] Publish the repository. Public at github.com/PedroColombas/newsagent.
+* [x] Publish the repository. Public at github.com/PedroColombas/daily.
       Checked first, because it cannot be undone: no API keys anywhere in the
       history, and the demo spending gate green against production.
 * [x] **Wire the "View the code" button.** The button is already on the landing
