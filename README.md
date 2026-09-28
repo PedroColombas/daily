@@ -76,7 +76,7 @@ ffmpeg into one episode with a branded intro and per-topic chapters.
 
 ---
 
-## Not built yet
+## Upcoming Features
 
 - **Source preferences** — choose which outlets each topic draws on, to favour trusted sources or
   exclude particular ones.
