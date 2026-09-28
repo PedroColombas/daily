@@ -87,9 +87,8 @@ ffmpeg into one episode with a branded intro and per-topic chapters.
 - **Notifications** — a push notification when the day's brief is ready.
 - **Native iOS app** — an App Store build of the existing app. It can already be installed to the
   home screen as a web app.
-- **Model refresh** — move each pipeline stage onto the current generation of models and re-balance
-  cost against quality, deciding each change with a structured before/after comparison of report
-  output.
+- **Model refresh** — implement current generation of models and re-balance cost against quality,
+  deciding each change with a structured before/after comparison of report output.
 
 Automatic weekday delivery is built but currently switched off, so the public demo does not incur
 API costs in the background. Briefs are generated on demand in the meantime.
