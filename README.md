@@ -76,27 +76,6 @@ ffmpeg into one episode with a branded intro and per-topic chapters.
 
 ---
 
-## Decisions worth explaining
-
-**Four topics, hard-capped.** Every section is a paid search plus synthesis tokens, so the cap is
-enforced in the shared planner (`shared/plan-topics.ts`) rather than in the UI — the pipeline
-cannot exceed it even if a request asks it to.
-
-**Genres are containers, not sections.** Originally a genre also became a broad report section,
-which quietly inflated the topic count and produced vague writing. Now a genre only opens a drawer
-of subtopics; the subtopics are the sections.
-
-**Length and tone controls were removed.** Readers could pick a report length and a voice. Neither
-earned anything a reader noticed, and both widened the surface the product had to explain, so
-synthesis is now fixed at one length and one tone. The columns are left in the table unused rather
-than dropped.
-
-**The demo never persists.** A visitor can reorder, add and delete topics and watch the preview
-respond — customisation is the product, so blocking it would hide the point — but nothing is
-written back. The nightly reset job exists anyway, as a second line of defence.
-
----
-
 ## Not built yet
 
 - Reader-chosen sources per topic. Interesting design work, deliberately deferred.
