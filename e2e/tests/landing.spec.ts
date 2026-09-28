@@ -29,11 +29,24 @@ test("the landing page leads into the demo, and the shots all load", async ({ pa
       .toBeGreaterThan(0);
   }
 
-  // "View the code" is deliberately inert until the repo is published (BACKLOG Phase 5). Assert it
-  // is either unlinked or pointing somewhere real — a button wired to "#" or "" is the failure mode
-  // worth catching, because it looks alive and goes nowhere.
+  // The repo link appears twice — once at the fold, once in the closer — so a visitor who never
+  // scrolls still has a route to the code. Both must point somewhere real: a button wired to "#"
+  // or "" is the failure worth catching, because it looks alive and goes nowhere.
   const code = page.locator("[data-code-link]");
-  await expect(code).toBeVisible();
-  const href = await code.getAttribute("href");
-  if (href !== null) expect(href).toMatch(/^https:\/\/github\.com\//);
+  await expect(code).toHaveCount(2);
+  for (const href of await code.evaluateAll((els) => els.map((e) => e.getAttribute("href")))) {
+    expect(href).toMatch(/^https:\/\/github\.com\//);
+  }
+
+  // The demo opens in a new tab on purpose: clicking it early must not discard the page, or an
+  // impatient visitor loses the only route to the repo along with it.
+  const demo = page.getByRole("link", { name: /try the demo/i });
+  await expect(demo).toHaveCount(2);
+  for (const target of await demo.evaluateAll((els) => els.map((e) => e.getAttribute("target")))) {
+    expect(target).toBe("_blank");
+  }
+
+  // The finding from user testing was that people did not realise the page continued, so the cue
+  // has to be reachable without scrolling first.
+  await expect(page.getByRole("link", { name: /see what it does/i })).toBeInViewport();
 });

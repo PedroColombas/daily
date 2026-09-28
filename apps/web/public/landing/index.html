@@ -24,6 +24,11 @@
   a{color:#c0512b;text-decoration:none;}
   a:hover{color:#9c3f20;}
   .shot{width:100%;height:100%;object-fit:cover;display:block;}
+  .more:hover{color:#1c1a17;}
+  .more__mark{animation:nudge 2.8s ease-in-out infinite;}
+  .more:hover .more__mark{animation-play-state:paused;}
+  @keyframes nudge{ 0%,74%,100%{transform:translateY(0);} 86%{transform:translateY(3px);} }
+  @media (prefers-reduced-motion:reduce){ .more__mark{animation:none;} }
   /* "Daily" wordmark — a sunrise arc over the "ai". Scales from font-size alone; leave 0.5em
      clear above it, because the arc overshoots the cap height. */
   .daily-logo{font-weight:700;letter-spacing:-.022em;color:#1c1a17;white-space:nowrap;}
@@ -56,9 +61,14 @@
         <h1 style="font-size:clamp(38px,5.4vw,62px);font-weight:700;letter-spacing:-.032em;line-height:1.02;margin:18px 0 0;text-wrap:pretty;">Your commute.<br>Fully briefed.</h1>
         <p style="font-size:clamp(16px,1.7vw,19px);color:#6f6a61;line-height:1.55;margin:22px 0 0;max-width:470px;text-wrap:pretty;">A personalised news briefing, written fresh each weekday from the topics you choose. Long shifts, early starts, no time to read around — one report covers it.</p>
         <div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:32px;">
-          <a href="/app" style="display:inline-block;background:#c0512b;color:#fff;border-radius:26px;padding:14px 26px;font-size:15.5px;font-weight:600;">Try the demo</a>
+          <a href="/app" target="_blank" rel="noopener" style="display:inline-block;background:#c0512b;color:#fff;border-radius:26px;padding:14px 26px;font-size:15.5px;font-weight:600;">Try the demo</a>
+          <a data-code-link href="https://github.com/PedroColombas/newsagent" target="_blank" rel="noopener" style="display:inline-block;border:1.5px solid #ddd6ca;background:#fff;border-radius:26px;padding:14px 26px;font-size:15.5px;font-weight:600;color:#1c1a17;">View the code</a>
         </div>
         <span style="font-size:13px;color:#8a8579;margin-top:18px;">Arrives whenever you want it · read in four minutes, or listen on the way in.</span>
+        <a href="#features" class="more" style="display:inline-flex;align-items:center;gap:7px;margin-top:26px;font-size:13.5px;font-weight:600;color:#6f6a61;">
+          See what it does
+          <svg class="more__mark" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#c0512b" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+        </a>
       </div>
       <div class="phone" style="justify-self:end;min-width:0;">
         <div style="width:min(300px,78vw);aspect-ratio:320/688;background:#0e0e10;border-radius:46px;padding:10px;box-shadow:0 34px 64px -20px rgba(45,32,20,.45),0 8px 18px rgba(0,0,0,.14);">
@@ -161,7 +171,7 @@
       <h2 style="font-size:clamp(30px,4vw,44px);font-weight:700;letter-spacing:-.028em;line-height:1.06;margin:0;max-width:640px;text-wrap:pretty;">Tomorrow's edition is already being written.</h2>
       <p style="font-size:17px;color:#6f6a61;line-height:1.55;margin:18px 0 0;max-width:440px;text-wrap:pretty;">Choose your topics once. We handle the reading, every weekday morning.</p>
       <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:12px;margin-top:30px;">
-        <a href="/app" style="display:inline-block;background:#c0512b;color:#fff;border-radius:26px;padding:15px 30px;font-size:16px;font-weight:600;">Try the demo</a>
+        <a href="/app" target="_blank" rel="noopener" style="display:inline-block;background:#c0512b;color:#fff;border-radius:26px;padding:15px 30px;font-size:16px;font-weight:600;">Try the demo</a>
         <a data-code-link href="https://github.com/PedroColombas/newsagent" target="_blank" rel="noopener" style="display:inline-block;border:1.5px solid #ddd6ca;background:#fff;border-radius:26px;padding:15px 30px;font-size:16px;font-weight:600;color:#1c1a17;">View the code</a>
       </div>
     </div>
