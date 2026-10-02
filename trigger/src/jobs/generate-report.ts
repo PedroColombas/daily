@@ -3,6 +3,7 @@ import { supabase } from "../lib/supabase";
 import { withDiagnostics } from "../lib/diagnostics";
 import { synthesize } from "../lib/synthesis";
 import { writeRecap } from "../lib/recap";
+import { createMeter } from "../lib/usage";
 import type { Preferences, ReportContent, ReportRecap } from "@shared/types";
 import type { FetchedTopic } from "./fetch-news";
 
@@ -10,7 +11,10 @@ export const generateReport = task({
   id: "generate-report",
   // Headroom for a large streamed synthesis (a primer-heavy first brief) + the optional recap.
   maxDuration: 600,
-  run: async (payload: { userId: string; date: string; topics: FetchedTopic[]; force?: boolean }) => {
+  run: async (
+    payload: { userId: string; date: string; topics: FetchedTopic[]; force?: boolean },
+    { ctx },
+  ) => {
     const { userId, date, topics, force } = payload;
     const db = supabase();
 
@@ -39,6 +43,7 @@ export const generateReport = task({
       .single();
     if (upsertError) throw upsertError;
     const reportId = row!.id as string;
+    const meter = createMeter({ runId: ctx.run.id, userId, reportId, date });
 
     try {
       const { data: prefsData, error: prefsError } = await db
@@ -50,7 +55,7 @@ export const generateReport = task({
       const prefs = prefsData as Preferences;
 
       const { content, markdown } = await withDiagnostics("synthesis", () =>
-        synthesize(prefs, topics),
+        synthesize(prefs, topics, meter),
       );
 
       // "While you were away" recap from briefs missed since the user last read one.
@@ -77,7 +82,10 @@ export const generateReport = task({
         const missed = lastReadDate ? prior.filter((r) => r.date > lastReadDate) : [];
         if (missed.length > 0) {
           const summary = await withDiagnostics("recap", () =>
-            writeRecap(missed.map((m) => ({ date: m.date, markdown: m.markdown ?? "" }))),
+            writeRecap(
+              missed.map((m) => ({ date: m.date, markdown: m.markdown ?? "" })),
+              meter,
+            ),
           );
           if (summary) recap = { summary, days: missed.length };
         }

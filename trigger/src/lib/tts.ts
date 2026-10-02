@@ -2,9 +2,13 @@ import { logger } from "@trigger.dev/sdk";
 import { optionalEnv } from "./env";
 import {
   synthesizeDialogue as openaiSynthesizeDialogue,
+  chunkText,
+  MAX_TTS_CHARS,
+  TTS_MODEL,
   type DialogueTurn,
   type SpeechOptions,
 } from "./openai-tts";
+import { noMeter, type Meter, type UsageEvent } from "./usage";
 import { elevenSynthesizeDialogue, ELEVEN_MODEL, type ElevenVoice } from "./elevenlabs-tts";
 import { introMp3 } from "./intro-audio";
 import { encodeUniformMp3 } from "./audio-encode";
@@ -59,13 +63,20 @@ const ELEVEN_CAST: Record<string, ElevenVoice> = {
 
 // Narrate a set of turns to a single voice track. Tries ElevenLabs first (when enabled and keyed),
 // falls back to OpenAI on any failure.
-async function narrate(turns: DialogueTurn[]): Promise<Buffer> {
+async function narrate(turns: DialogueTurn[], meter: Meter): Promise<Buffer> {
+  const started = Date.now();
   const useEleven = TTS_PROVIDER === "elevenlabs" && !!optionalEnv("ELEVENLABS_API_KEY");
   if (useEleven) {
     try {
       const audio = await elevenSynthesizeDialogue(turns, ELEVEN_CAST);
       // So the run log clearly states which engine + model actually narrated (verifiable, no guessing).
       logger.info(`TTS narrated via ElevenLabs (${ELEVEN_MODEL})`);
+      await meter({
+        ...ttsEvent(turns),
+        provider: "elevenlabs",
+        model: ELEVEN_MODEL,
+        durationMs: Date.now() - started,
+      });
       return audio;
     } catch (err) {
       logger.warn("ElevenLabs TTS failed — falling back to OpenAI", {
@@ -74,7 +85,28 @@ async function narrate(turns: DialogueTurn[]): Promise<Buffer> {
     }
   }
   logger.info("TTS narrated via OpenAI");
-  return openaiSynthesizeDialogue(turns, OPENAI_CAST);
+  const audio = await openaiSynthesizeDialogue(turns, OPENAI_CAST);
+  await meter({
+    ...ttsEvent(turns),
+    provider: "openai",
+    model: TTS_MODEL,
+    durationMs: Date.now() - started,
+  });
+  return audio;
+}
+
+// Speech APIs return no usage, so what a narration costs is derived from the text: one request per
+// chunk, and minutes estimated at 150 wpm (the same rate the player's duration estimate uses).
+function ttsEvent(turns: DialogueTurn[]): Pick<UsageEvent, "stage" | "requests" | "extra"> {
+  const spoken = turns.filter((t) => t.text.trim());
+  const characters = spoken.reduce((n, t) => n + t.text.length, 0);
+  const words = spoken.reduce((n, t) => n + t.text.trim().split(/\s+/).length, 0);
+  const requests = spoken.reduce((n, t) => n + chunkText(t.text, MAX_TTS_CHARS).length, 0);
+  return {
+    stage: "tts",
+    requests,
+    extra: { turns: spoken.length, characters, words, estimated_minutes: words / 150 },
+  };
 }
 
 // Narrate the full episode with the branded intro sting placed after the host's opening (welcome +
@@ -82,15 +114,18 @@ async function narrate(turns: DialogueTurn[]): Promise<Buffer> {
 // uniform mp3 via ffmpeg so the 44.1kHz/stereo sting can't be silently dropped by iOS's decoder
 // (which locks onto the first frame's format). If ffmpeg fails for ANY reason we ship voice-only
 // (opening + rest, no sting) so an episode never breaks on the audio-assembly step.
-export async function synthesizeDialogue(turns: DialogueTurn[]): Promise<Buffer> {
+export async function synthesizeDialogue(
+  turns: DialogueTurn[],
+  meter: Meter = noMeter,
+): Promise<Buffer> {
   if (turns.length === 0) return Buffer.alloc(0);
 
   // The sting lands right after the host's opening welcome + topic preview (the first turn) and
   // BEFORE any catch-up recap — the script is structured welcome+preview → catch-up → topics.
   const split = 1;
 
-  const opening = await narrate(turns.slice(0, split));
-  const rest = split < turns.length ? await narrate(turns.slice(split)) : Buffer.alloc(0);
+  const opening = await narrate(turns.slice(0, split), meter);
+  const rest = split < turns.length ? await narrate(turns.slice(split), meter) : Buffer.alloc(0);
 
   try {
     // encodeUniformMp3 drops empty buffers, so an empty `rest` (few-turn episode) is safe.

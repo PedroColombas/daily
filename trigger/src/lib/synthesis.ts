@@ -1,4 +1,5 @@
 import { anthropic, MODELS, firstText } from "./anthropic";
+import { anthropicUsage, noMeter, type Meter } from "./usage";
 import type { Preferences, ReportContent, ReportSection } from "@shared/types";
 import type { FetchedTopic } from "../jobs/fetch-news";
 
@@ -69,6 +70,7 @@ interface SynthesisOutput {
 export async function synthesize(
   prefs: Preferences,
   topics: FetchedTopic[],
+  meter: Meter = noMeter,
 ): Promise<{ content: ReportContent; markdown: string }> {
   // Per-user, volatile content goes in the user turn — after the cached system prefix.
   const topicsForModel = topics.map((t, index) => ({
@@ -88,6 +90,7 @@ export async function synthesize(
     "Write the report now.";
 
   const model = MODELS.synthesis;
+  const started = Date.now();
 
   // Streamed: a new user's first brief is ALL primers (longer), so the output is still sizeable even
   // with markdown built in code; adaptive thinking shares this budget too. A non-streaming request at
@@ -106,6 +109,21 @@ export async function synthesize(
       messages: [{ role: "user", content: userMessage }],
     })
     .finalMessage();
+
+  // Recorded before the quality guards below: a degraded response still cost money.
+  await meter({
+    stage: "synthesise",
+    provider: "anthropic",
+    model,
+    ...anthropicUsage(message),
+    durationMs: Date.now() - started,
+    extra: {
+      topics: topics.length,
+      primers: topics.filter((t) => t.isPrimer).length,
+      stop_reason: message.stop_reason,
+      effort: "medium",
+    },
+  });
 
   // A truncated (max_tokens) or text-less response would fail JSON.parse with a cryptic
   // "Unexpected end of JSON input" — surface a clear, diagnosable error instead (Trigger retries).

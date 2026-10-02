@@ -1,7 +1,8 @@
 import { task, logger } from "@trigger.dev/sdk";
 import { supabase } from "../lib/supabase";
 import { anthropic, MODELS, firstText } from "../lib/anthropic";
-import { perplexitySearch } from "../lib/perplexity";
+import { perplexitySearch, PERPLEXITY_MODEL } from "../lib/perplexity";
+import { anthropicUsage, createMeter, type Meter } from "../lib/usage";
 import { withDiagnostics } from "../lib/diagnostics";
 import { mapWithConcurrency, withRetry } from "../lib/concurrency";
 import { generateReport } from "./generate-report";
@@ -34,8 +35,10 @@ const PERPLEXITY_CONCURRENCY = 1;
 export const fetchNews = task({
   id: "fetch-news",
   maxDuration: 300,
-  run: async (payload: { userId: string; date: string; force?: boolean }) => {
+  run: async (payload: { userId: string; date: string; force?: boolean }, { ctx }) => {
     const { userId, date, force } = payload;
+    // Every paid call this run makes lands in the usage ledger against this reader and date.
+    const meter = createMeter({ runId: ctx.run.id, userId, date });
 
     try {
       // If today's brief is already complete (a duplicate click, a Trigger retry, or the daily
@@ -103,7 +106,7 @@ export const fetchNews = task({
       // and on-demand paths always agree — and so the shared cache key (topic, date) fully determines
       // the window (a payload flag would let callers disagree and cross-contaminate the cache).
       const weekendCatchup = new Date(`${date}T00:00:00Z`).getUTCDay() === 1;
-      const topics = await buildTopicQueries(prefs, briefed, weekendCatchup);
+      const topics = await buildTopicQueries(prefs, briefed, weekendCatchup, meter);
       logger.info("resolved topic queries", {
         userId,
         count: topics.length,
@@ -120,14 +123,24 @@ export const fetchNews = task({
         async (t) => {
           const shareable = (t.level === 1 || t.level === 2) && !t.isPrimer;
           const result = shareable
-            ? await getCachedOrFetch(t, date)
+            ? await getCachedOrFetch(t, date, meter)
             : await withRetry(() =>
                 withDiagnostics(`perplexity:${t.topic}`, () =>
-                  perplexitySearch(t.query, {
-                    recency: t.recency,
-                    system: SYSTEM_PROMPT,
-                    contextSize: t.isPrimer ? "high" : "medium",
-                  }),
+                  perplexitySearch(
+                    t.query,
+                    {
+                      recency: t.recency,
+                      system: SYSTEM_PROMPT,
+                      contextSize: t.isPrimer ? "high" : "medium",
+                      meta: {
+                        topic: t.topic,
+                        topic_key: t.topicKey,
+                        cache: "not_shareable",
+                        primer: t.isPrimer,
+                      },
+                    },
+                    meter,
+                  ),
                 ),
               );
           return { ...t, content: result.content, sources: result.sources };
@@ -171,6 +184,7 @@ export const fetchNews = task({
 async function getCachedOrFetch(
   t: TopicQuery,
   date: string,
+  meter: Meter,
 ): Promise<{ content: string; sources: ReportSource[] }> {
   const db = supabase();
   const { data: hit, error: readErr } = await db
@@ -184,12 +198,30 @@ async function getCachedOrFetch(
   if (readErr) logger.warn("topic cache read failed", { topicKey: t.topicKey, error: readErr.message });
   if (hit) {
     logger.info("topic cache hit", { topicKey: t.topicKey, date });
+    // A hit is a search not paid for. Recorded at zero cost so the saving shows in the ledger —
+    // the hit rate is one of the numbers the cost work needs.
+    await meter({
+      stage: "retrieve",
+      provider: "perplexity",
+      model: PERPLEXITY_MODEL,
+      requests: 0,
+      extra: { topic: t.topic, topic_key: t.topicKey, cache: "hit" },
+    });
     return { content: hit.content as string, sources: (hit.sources ?? []) as ReportSource[] };
   }
 
   const result = await withRetry(() =>
     withDiagnostics(`perplexity:${t.topic}`, () =>
-      perplexitySearch(t.query, { recency: t.recency, system: SYSTEM_PROMPT, contextSize: "medium" }),
+      perplexitySearch(
+        t.query,
+        {
+          recency: t.recency,
+          system: SYSTEM_PROMPT,
+          contextSize: "medium",
+          meta: { topic: t.topic, topic_key: t.topicKey, cache: "miss" },
+        },
+        meter,
+      ),
     ),
   );
   // Populate the shared cache. ignoreDuplicates → if another user won the race, keep their row.
@@ -287,6 +319,7 @@ async function buildTopicQueries(
   prefs: Preferences,
   briefed: Set<string>,
   weekendCatchup: boolean,
+  meter: Meter,
 ): Promise<TopicQuery[]> {
   // Which sections (and their order) is shared with the app's edition preview via
   // planReportSections, so the two never drift. Here we resolve each into a query.
@@ -298,7 +331,7 @@ async function buildTopicQueries(
 
     // L3 custom interests: sharpen the raw free-text into a clean search label.
     const topic =
-      planned.level === 3 ? await resolveInterestTopic(planned.topic) : planned.topic;
+      planned.level === 3 ? await resolveInterestTopic(planned.topic, meter) : planned.topic;
     // Primer takes precedence; otherwise Monday's weekend sweep widens the window.
     const recency = isPrimer ? PRIMER_WINDOW : weekendCatchup ? WEEKEND_WINDOW : DAILY_WINDOW;
 
@@ -319,7 +352,8 @@ async function buildTopicQueries(
   return out;
 }
 
-async function resolveInterestTopic(interest: string): Promise<string> {
+async function resolveInterestTopic(interest: string, meter: Meter): Promise<string> {
+  const started = Date.now();
   const message = await withDiagnostics("resolve-interest", () =>
     anthropic().messages.create({
       model: MODELS.queryTranslation,
@@ -331,5 +365,12 @@ async function resolveInterestTopic(interest: string): Promise<string> {
       messages: [{ role: "user", content: interest }],
     }),
   );
+  await meter({
+    stage: "resolve",
+    provider: "anthropic",
+    model: MODELS.queryTranslation,
+    ...anthropicUsage(message),
+    durationMs: Date.now() - started,
+  });
   return firstText(message.content).trim() || interest;
 }

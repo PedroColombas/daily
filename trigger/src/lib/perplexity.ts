@@ -1,4 +1,5 @@
 import { requireEnv } from "./env";
+import { noMeter, type Meter } from "./usage";
 import type { Recency, ReportSource } from "@shared/types";
 
 // Perplexity is OpenAI-compatible over plain HTTP — no SDK needed. We surface non-2xx and
@@ -17,11 +18,13 @@ export interface PerplexityOptions {
   recency: Recency; // -> search_recency_filter (day / week / month)
   system?: string; // optional system prompt
   contextSize?: "low" | "medium" | "high"; // search depth; defaults to medium
+  meta?: Record<string, unknown>; // tags for the usage ledger (topic, cache state…)
 }
 
 export async function perplexitySearch(
   userPrompt: string,
   opts: PerplexityOptions,
+  meter: Meter = noMeter,
 ): Promise<PerplexityResult> {
   const messages = opts.system
     ? [
@@ -30,6 +33,7 @@ export async function perplexitySearch(
       ]
     : [{ role: "user", content: userPrompt }];
 
+  const started = Date.now();
   const res = await fetch(PERPLEXITY_URL, {
     method: "POST",
     headers: {
@@ -55,7 +59,29 @@ export async function perplexitySearch(
     throw new Error(`Perplexity returned no content: ${JSON.stringify(data).slice(0, 500)}`);
   }
 
-  return { content, sources: extractSources(data) };
+  const sources = extractSources(data);
+
+  // Perplexity bills per request (by context size) plus per token; newer API versions also return
+  // their own cost figure, which the meter prefers over the estimate when present.
+  const u = data?.usage ?? {};
+  await meter({
+    stage: "retrieve",
+    provider: "perplexity",
+    model: PERPLEXITY_MODEL,
+    inputTokens: u.prompt_tokens,
+    outputTokens: u.completion_tokens,
+    durationMs: Date.now() - started,
+    reportedCostUsd: typeof u?.cost?.total_cost === "number" ? u.cost.total_cost : undefined,
+    extra: {
+      search_context_size: opts.contextSize ?? "medium",
+      recency: opts.recency,
+      sources: sources.length,
+      usage: u,
+      ...(opts.meta ?? {}),
+    },
+  });
+
+  return { content, sources };
 }
 
 // Prefer the rich search_results (title + url + date); fall back to the citations URL list.

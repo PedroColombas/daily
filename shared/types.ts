@@ -117,3 +117,28 @@ export interface PodcastEpisode {
   status: PodcastStatus;
   created_at: string;
 }
+
+// One paid call made by the pipeline — mirrors pipeline_usage (migration 0015). Pipeline-only:
+// written by trigger/src/lib/usage.ts and read in SQL (the pipeline_usage_by_brief view); the app
+// never touches it. Raw counts are the source of truth; cost_usd is an estimate stamped with the
+// price list it was computed from.
+export interface PipelineUsage {
+  id: number;
+  created_at: string;
+  run_id: string | null;
+  user_id: string | null;
+  report_id: string | null;
+  date: string | null;
+  stage: 'resolve' | 'retrieve' | 'synthesise' | 'recap' | 'podcast_script' | 'tts';
+  provider: 'anthropic' | 'perplexity' | 'openai' | 'elevenlabs';
+  model: string;
+  requests: number;
+  input_tokens: number | null;
+  output_tokens: number | null;
+  cache_read_tokens: number | null;
+  cache_write_tokens: number | null;
+  duration_ms: number | null;
+  cost_usd: number | null;
+  price_version: string | null;
+  extra: Record<string, unknown>;
+}

@@ -114,7 +114,7 @@ contains, so the app's preview and the pipeline's real section list cannot drift
 on Vercel, the pipeline is deployed to Trigger.dev, and a public demo account serves
 seeded briefs with all paid calls gated off.
 
-- **Data** — 14 migrations. RLS on every table; reports and podcasts are read-only from
+- **Data** — 15 migrations. RLS on every table; reports and podcasts are read-only from
   the frontend, the pipeline writes as service_role. Private `podcast-audio` bucket.
 - **Pipeline** — `fetch-news` (Perplexity, one query per topic, shared per-day cache) →
   `generate-report` (Opus synthesis, primers, "while you were away" recaps) →
@@ -164,6 +164,10 @@ database. So:
 - `delivery_hour` is UTC in the DB; convert to/from local time in the UI.
 - When adding a pipeline step, make it idempotent and safe to retry (Trigger.dev
   may re-run). Check report `status` before regenerating.
+- **Every paid API call is metered.** Pass the run's `Meter` (`createMeter` in
+  `trigger/src/lib/usage.ts`) into any function that calls Anthropic, Perplexity or a
+  speech API, and record the call. The cost work depends on `pipeline_usage` being
+  complete; an unmetered call is a bug, not an omission.
 - Keep each build phase's work coherent; don't jump ahead across phases.
 
 ## Anthropic API notes

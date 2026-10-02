@@ -61,6 +61,32 @@ npm run preview:synthesis
 npm run preview:podcast
 ```
 
+## Measuring cost
+
+Every paid call — each Perplexity search, each Claude call, each speech request — is recorded in
+the `pipeline_usage` table by `src/lib/usage.ts`: tokens in and out, requests, duration, and an
+estimated cost. Cache hits are recorded too, at zero cost, so the saving is visible. The pipeline
+never measured its own cost before this; every earlier per-brief figure was an estimate.
+
+What a brief cost, split into report and podcast with a per-stage breakdown:
+
+```sql
+select * from pipeline_usage_by_brief;
+```
+
+Where the money goes, across everything recorded:
+
+```sql
+select stage, model, count(*) as calls, sum(requests) as requests,
+       round(sum(cost_usd), 4) as usd
+from pipeline_usage group by 1, 2 order by usd desc;
+```
+
+Raw token counts are the source of truth. `cost_usd` is estimated at write time from the price list
+in `usage.ts` and stamped with `price_version`; if a price there is wrong, fix it and recompute from
+the counts rather than trusting old rows. **When you add a paid call, give it the meter** — an
+unmetered call is a hole in the baseline.
+
 ## Setup
 
 1. Create a Trigger.dev project and put its ref in `trigger.config.ts`.

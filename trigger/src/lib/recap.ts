@@ -1,9 +1,11 @@
 import { anthropic, MODELS, firstText } from "./anthropic";
+import { anthropicUsage, noMeter, type Meter } from "./usage";
 
 // "While you were away" — condense the briefs a returning reader missed into a short recap.
 // Built from already-generated reports (no new fetch). Mid-tier model (a condensation).
 export async function writeRecap(
   missed: { date: string; markdown: string }[],
+  meter: Meter = noMeter,
 ): Promise<string> {
   const usable = missed.filter((m) => m.markdown && m.markdown.trim());
   if (usable.length === 0) return "";
@@ -21,11 +23,21 @@ export async function writeRecap(
 
   const userMessage = usable.map((m) => `Brief — ${m.date}\n\n${m.markdown}`).join("\n\n———\n\n");
 
+  const started = Date.now();
   const message = await anthropic().messages.create({
     model: MODELS.podcastScript, // Sonnet — a condensation/rewrite, not the heavy synthesis
     max_tokens: 1200,
     system,
     messages: [{ role: "user", content: userMessage }],
+  });
+
+  await meter({
+    stage: "recap",
+    provider: "anthropic",
+    model: MODELS.podcastScript,
+    ...anthropicUsage(message),
+    durationMs: Date.now() - started,
+    extra: { missed_days: days },
   });
 
   // Defensive: drop a leading title/heading line the model may still add (the card has its own).

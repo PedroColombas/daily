@@ -4,6 +4,7 @@ import { withDiagnostics } from "../lib/diagnostics";
 import { writeScript } from "../lib/podcast-script";
 import { synthesizeDialogue, type DialogueTurn } from "../lib/tts";
 import { INTRO_SECONDS } from "../lib/intro-audio";
+import { createMeter } from "../lib/usage";
 import type { ReportContent } from "@shared/types";
 
 const AUDIO_BUCKET = "podcast-audio";
@@ -13,13 +14,13 @@ export const generatePodcast = task({
   // Headroom for the slower expressive TTS models (eleven_v3). Parallel synthesis keeps real time
   // well under this; the bump is a safety margin so a long episode can't be killed mid-render.
   maxDuration: 600,
-  run: async (payload: { reportId: string; force?: boolean; turns?: DialogueTurn[] }) => {
+  run: async (payload: { reportId: string; force?: boolean; turns?: DialogueTurn[] }, { ctx }) => {
     const { reportId, force } = payload;
     const db = supabase();
 
     const { data: report, error: reportError } = await db
       .from("reports")
-      .select("id, user_id, markdown, content")
+      .select("id, user_id, date, markdown, content")
       .eq("id", reportId)
       .single();
     if (reportError) throw reportError;
@@ -50,6 +51,12 @@ export const generatePodcast = task({
       .single();
     if (upsertError) throw upsertError;
     const episodeId = row!.id as string;
+    const meter = createMeter({
+      runId: ctx.run.id,
+      userId,
+      reportId,
+      date: report!.date as string,
+    });
 
     try {
       if (!markdown && !payload.turns) throw new Error("report has no markdown to narrate");
@@ -64,6 +71,7 @@ export const generatePodcast = task({
             markdown!,
             sections.map((s) => ({ heading: s.topic, isPrimer: Boolean(s.isPrimer) })),
             recap,
+            meter,
           ),
         ));
       if (turns.length === 0) throw new Error("podcast script came back empty");
@@ -72,7 +80,7 @@ export const generatePodcast = task({
 
       // 2. Synthesise each turn in its speaker's voice; concatenate the segments in order.
       //    (ElevenLabs when configured, else OpenAI — the tts facade picks + falls back.)
-      const audio = await withDiagnostics("tts", () => synthesizeDialogue(turns));
+      const audio = await withDiagnostics("tts", () => synthesizeDialogue(turns, meter));
 
       // 3. Upload to the private bucket, namespaced by user (service_role bypasses storage
       //    RLS). `audio_url` stores the PATH, not a URL — see schema + 0003_storage.sql.

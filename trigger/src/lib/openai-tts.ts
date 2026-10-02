@@ -18,7 +18,7 @@ export const TTS_MODEL = "gpt-4o-mini-tts";
 
 // gpt-4o-mini-tts caps at ~2000 input tokens per request, so longer text must be
 // segmented. We chunk conservatively by characters (~1000 tokens of headroom).
-const MAX_TTS_CHARS = 4000;
+export const MAX_TTS_CHARS = 4000;
 
 // OpenAI TTS is one request per chunk; its rate limits are generous, so run several concurrently.
 const TTS_CONCURRENCY = 6;

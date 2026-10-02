@@ -1,4 +1,5 @@
 import { anthropic, MODELS, firstText } from "./anthropic";
+import { anthropicUsage, noMeter, type Meter } from "./usage";
 import type { DialogueTurn } from "./openai-tts";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -66,6 +67,7 @@ export async function writeScript(
   markdown: string,
   sections: { heading: string; isPrimer: boolean }[] = [],
   recap?: string,
+  meter: Meter = noMeter,
 ): Promise<DialogueTurn[]> {
   const sectionList =
     sections.length > 0
@@ -78,6 +80,7 @@ export async function writeScript(
     ? `\n\n"While you were away" recap (the listener missed recent briefs — open with a short "here's what you've missed since last time" segment from this, then today's topics):\n${recap}`
     : "";
 
+  const started = Date.now();
   const message = await anthropic().messages.create({
     model: MODELS.podcastScript,
     max_tokens: 8000,
@@ -92,6 +95,15 @@ export async function writeScript(
         content: `Here is today's report. Write the two-person interview script.\n\n${markdown}${sectionList}${recapBlock}`,
       },
     ],
+  });
+
+  await meter({
+    stage: "podcast_script",
+    provider: "anthropic",
+    model: MODELS.podcastScript,
+    ...anthropicUsage(message),
+    durationMs: Date.now() - started,
+    extra: { sections: sections.length, with_recap: Boolean(recap), effort: "medium" },
   });
 
   const parsed = JSON.parse(firstText(message.content)) as PodcastScript;
