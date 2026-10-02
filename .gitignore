@@ -36,6 +36,8 @@ Thumbs.db
 .vscode/
 *.swp
 captures/
+# Vercel preview bypass cookie written by the e2e global setup
+e2e/.auth/
 
 # Loose design exports dropped in the repo root while working. The ones worth keeping live in
 # docs/design/; these are duplicates and one-off exports, kept locally but never published.

@@ -1,23 +1,35 @@
-# Runs the demo-path suite against the DEPLOYED app. Nothing local is needed - no database, no
-# secrets beyond the public address, because the demo signs itself in with credentials the app
-# already ships. Set DEMO_BASE_URL as a repository secret (or variable) before enabling this.
+# Runs the demo-path suite against a DEPLOYED build, triggered by Vercel reporting a finished
+# deployment rather than by a push. Two reasons:
+#
+#  - A push is not a deploy. Triggering on push raced the build and tested the previous version.
+#  - Every branch gets a Vercel preview, so the suite now runs against the preview BEFORE anything is
+#    merged — a change that would break the public demo shows up red on the branch, not live.
+#
+# Previews sit behind a Vercel login; VERCEL_AUTOMATION_BYPASS_SECRET lets the suite through (see
+# e2e/global-setup.ts). Production runs against DEMO_BASE_URL, the public domain.
 name: e2e
 
 on:
-  push:
-    branches: [main]
-  pull_request:
+  deployment_status:
   workflow_dispatch:
 
 jobs:
   demo-path:
     runs-on: ubuntu-latest
-    # A pull request from a FORK gets no secrets, so DEMO_BASE_URL would be empty and the run would
-    # fail for a reason that has nothing to do with the change. Skip those rather than show a
-    # stranger a red X on their first contribution; pushes and same-repo PRs run normally.
+    # Vercel posts several statuses per deployment (pending, then success or failure); only a
+    # finished, successful one is worth testing.
     if: >-
-      github.event_name != 'pull_request' ||
-      github.event.pull_request.head.repo.full_name == github.repository
+      github.event_name == 'workflow_dispatch' ||
+      github.event.deployment_status.state == 'success'
+    env:
+      DEMO_BASE_URL: >-
+        ${{ github.event.deployment.environment == 'Preview'
+            && github.event.deployment_status.environment_url
+            || secrets.DEMO_BASE_URL }}
+      VERCEL_AUTOMATION_BYPASS_SECRET: >-
+        ${{ github.event.deployment.environment == 'Preview'
+            && secrets.VERCEL_AUTOMATION_BYPASS_SECRET
+            || '' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -33,10 +45,8 @@ jobs:
         working-directory: e2e
         run: npx playwright install --with-deps chromium
 
-      - name: Run the demo-path suite
+      - name: Run the demo-path suite against ${{ github.event.deployment.environment || 'production' }}
         working-directory: e2e
-        env:
-          DEMO_BASE_URL: ${{ secrets.DEMO_BASE_URL }}
         run: npm test
 
       - name: Keep the report on failure

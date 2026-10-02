@@ -10,8 +10,14 @@ if (!baseURL) {
   );
 }
 
+// Preview deployments sit behind a Vercel login. With the bypass secret set, global-setup.ts trades
+// it for a cookie the tests carry; without it (e.g. against the public production domain) nothing
+// changes.
+const bypass = !!process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
+
 export default defineConfig({
   testDir: "./tests",
+  globalSetup: bypass ? "./global-setup.ts" : undefined,
   // Assertions here are deliberately coarse — does it render, does it navigate, does the player
   // dock. A red badge on a public repo is worse than no badge, so nothing depends on timing or
   // pixels, and nothing outside the demo path is covered.
@@ -24,6 +30,7 @@ export default defineConfig({
     // The app is mobile-first, so it is tested at phone size rather than on a desktop viewport.
     ...devices["Pixel 7"],
     baseURL,
+    ...(bypass ? { storageState: ".auth/vercel-bypass.json" } : {}),
     trace: "on-first-retry",
   },
 });
