@@ -137,6 +137,19 @@ something.
 It is written around one goal: this is a portfolio artifact, so nothing in the demo path
 may trigger a paid API call, and a visitor must never need an account.
 
+## How to make changes without touching the demo
+
+The demo is not a separate app: it is the demo account signed into the same app, code and
+database. So:
+
+- **Work on a branch, never directly on `main`.** Each branch gets a private Vercel preview, and the
+  e2e suite runs against it automatically. Merge only when it is green.
+- **Database changes go live the moment they are run in Supabase**, whatever the branch, and there
+  is one database. Keep them additive (new columns with defaults, new tables) — no renames or drops.
+- **Previews use the real database.** Testing on the owner's account there writes real data.
+- **Anything that changes report format must still render the four frozen demo briefs.**
+- **A feature wanted live but not in the demo** — gate it on `prefs.is_demo`.
+
 ## Conventions
 
 - TypeScript everywhere. Import shared types from `shared/types.ts`; never

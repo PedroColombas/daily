@@ -24,6 +24,19 @@ On Windows PowerShell:
 $env:DEMO_BASE_URL = "https://your-app.vercel.app"; npm test
 ```
 
+## When they run
+
+Automatically, whenever Vercel finishes a deployment (`.github/workflows/e2e.yml`):
+
+- **A branch** gets a Vercel preview, and the suite runs against it. A change that would break the
+  public demo shows up red on the branch, before it can be merged.
+- **`main`** runs against the public domain once the new build is actually serving.
+
+Previews sit behind a Vercel login. CI gets through with the repository secret
+`VERCEL_AUTOMATION_BYPASS_SECRET` (created under the Vercel project's Deployment Protection
+settings), which `global-setup.ts` swaps for a cookie scoped to the preview's own domain. To run
+against a preview from your own machine, set the same variable alongside `DEMO_BASE_URL`.
+
 ## What is covered
 
 | File | What it protects |
