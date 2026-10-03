@@ -8,6 +8,11 @@ export function formatReportDate(date: string): string {
   return `${weekday} · ${rest}`;
 }
 
+// The same date for use inside a sentence: "2026-06-27" -> "Saturday 27 June".
+export function formatReportDateInline(date: string): string {
+  return formatReportDate(date).replace(" · ", " ");
+}
+
 export function greeting(now: Date = new Date()): string {
   const h = now.getHours();
   if (h < 12) return "Good morning";

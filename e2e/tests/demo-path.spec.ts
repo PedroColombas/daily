@@ -14,6 +14,13 @@ test.describe("the path a visitor walks", () => {
     await enterDemo(page);
   });
 
+  test("the demo is never offered a fresh brief", async ({ page }) => {
+    // Its briefs are from September and it cannot generate, so the "get today's brief" card that
+    // real readers see on an older brief must never appear for it.
+    await expect(page.locator('[data-tour="topic"]').first()).toBeVisible();
+    await expect(page.locator("[data-stale-brief]")).toHaveCount(0);
+  });
+
   test("lands on a brief", async ({ page }) => {
     // The demo plays the real compiling screen for a moment first, hence the patience here.
     await expect(page.locator('[data-tour="topic"]')).toBeVisible();

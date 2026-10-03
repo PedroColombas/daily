@@ -9,6 +9,7 @@ import { markPending, readPending, clearPending } from "../lib/pending-generatio
 import { formatDeliveryHour } from "../lib/delivery-time";
 import {
   formatReportDate,
+  formatReportDateInline,
   greeting,
   displayName,
   estimateReadMinutes,
@@ -230,6 +231,13 @@ export function Today() {
 
   const sections = brief.content.sections;
   const name = displayName(user);
+  // The screen shows the latest brief whatever its date, and with the daily schedule switched off
+  // nothing else will produce a new one — so when the latest isn't today's, offer to fetch it.
+  // UTC, to match the date the server stamps on a brief. Never for the demo: it can't generate, and
+  // its briefs are meant to look like any reader's latest edition. Not alongside a failure either —
+  // that notice already carries its own "Try again".
+  const todayUtc = new Date().toISOString().slice(0, 10);
+  const offerToday = !prefs?.is_demo && brief.date !== todayUtc && !showFailure;
   const minutes = estimateReadMinutes(sections.map((s) => s.summary));
   const playable: PlayerEpisode | null =
     episode?.status === "complete" && episode.audio_url
@@ -267,6 +275,28 @@ export function Today() {
               Dismiss
             </button>
           </div>
+        </div>
+      )}
+
+      {offerToday && (
+        <div
+          data-stale-brief
+          className="mb-5 flex items-center gap-3 rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-3.5"
+        >
+          <div className="min-w-0 flex-1">
+            <p className="text-[13.5px] font-semibold">
+              This brief is from {formatReportDateInline(brief.date)}
+            </p>
+            <p className="mt-0.5 text-[12.5px] leading-relaxed text-[var(--muted)]">
+              Today&rsquo;s takes about 3&ndash;4 minutes to write.
+            </p>
+          </div>
+          <button
+            onClick={() => void generateNow()}
+            className="flex-none rounded-full bg-[var(--accent)] px-4 py-2 text-[13px] font-semibold text-[var(--on-accent)] active:opacity-80"
+          >
+            Get today&rsquo;s
+          </button>
         </div>
       )}
 
