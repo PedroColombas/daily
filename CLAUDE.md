@@ -102,7 +102,7 @@ daily/
 │   ├── jobs/                  # one file per stage + the cron + the demo seeders
 │   ├── lib/                   # Perplexity, Anthropic, TTS, audio assembly, concurrency
 │   └── fixtures/              # demo + TTS-test data
-├── supabase/migrations/       # 0001–0014; schema, RLS, storage
+├── supabase/migrations/       # 0001–0015; schema, RLS, storage, usage ledger
 ├── shared/                    # types + the topic planner, used by BOTH app and pipeline
 ├── e2e/                       # Playwright, run against the deployed app
 └── docs/                      # architecture diagram + design/ (Claude Design exports)
@@ -119,13 +119,14 @@ seeded briefs with all paid calls gated off.
 
 - **Data** — 15 migrations. RLS on every table; reports and podcasts are read-only from
   the frontend, the pipeline writes as service_role. Private `podcast-audio` bucket.
-- **Pipeline** — `fetch-news` (Perplexity, one query per topic, shared per-day cache) →
+- **Pipeline** — `fetch-news` (Perplexity, one query per topic, shared per-day cache for catalogue
+  topics and their first-time primers) →
   `generate-report` (Opus synthesis, primers, "while you were away" recaps) →
   `generate-podcast` (Sonnet script, OpenAI TTS, ffmpeg assembly). `daily-report` is the
   cron orchestrator. Plus `seed-demo-briefs`, `reset-demo`, `seed-test-episode`.
 - **App** — auth, bottom nav, Today / History / Report / Preferences / Profile, the setup
   wizard, and the docked podcast player.
-- **Shopfront** — landing page at `/landing/`, architecture diagram, README.
+- **Shopfront** — landing page at the site root (the app is at `/app`), architecture diagram, README.
 
 Schema is the source of truth. If you change a table, update BOTH the migration AND
 `shared/types.ts` in the same change.

@@ -114,14 +114,14 @@ export const fetchNews = task({
       });
 
       // One Perplexity query per topic, run with bounded concurrency (was sequential — the slow part
-      // of a first brief). Canonical topics (genre/subtopic, non-primer) share one result per
-      // (topic, day) via topic_news_cache across ALL users; custom interests + first-time primers
-      // stay per-user. withRetry rides out a transient 429 from parallel calls. Order is preserved.
+      // of a first brief). Canonical topics (genre/subtopic) share one result per (topic, day) via
+      // topic_news_cache across ALL users — first-time primers included, under their own key, since a
+      // primer's query depends only on the topic. Custom interests stay per-user. withRetry rides out a transient 429 from parallel calls. Order is preserved.
       const fetched: FetchedTopic[] = await mapWithConcurrency(
         topics,
         PERPLEXITY_CONCURRENCY,
         async (t) => {
-          const shareable = (t.level === 1 || t.level === 2) && !t.isPrimer;
+          const shareable = t.level === 1 || t.level === 2;
           const result = shareable
             ? await getCachedOrFetch(t, date, meter)
             : await withRetry(() =>
@@ -186,18 +186,24 @@ async function getCachedOrFetch(
   date: string,
   meter: Meter,
 ): Promise<{ content: string; sources: ReportSource[] }> {
+  // A first-time primer is a different search (background, wider window, deeper context) from the
+  // day's headlines for the same topic, so it is cached under its own key. Its query depends only on
+  // the topic — how much catch-up a reader wants is applied later, in synthesis — so it is identical
+  // for every reader new to that topic that day. It is also the most expensive search there is
+  // ($0.043 vs ~$0.023, measured 2026-10-03), so sharing it makes onboarding cheaper at scale.
+  const cacheKey = t.isPrimer ? `primer:${t.topicKey}` : t.topicKey;
   const db = supabase();
   const { data: hit, error: readErr } = await db
     .from("topic_news_cache")
     .select("content, sources")
-    .eq("topic_key", t.topicKey)
+    .eq("topic_key", cacheKey)
     .eq("date", date)
     .maybeSingle();
   // A read failure degrades safely to a fresh fetch — but log it, or a broken cache (unapplied
   // migration, RLS/grant drift) would silently revert everyone to full-price queries with no signal.
-  if (readErr) logger.warn("topic cache read failed", { topicKey: t.topicKey, error: readErr.message });
+  if (readErr) logger.warn("topic cache read failed", { topicKey: cacheKey, error: readErr.message });
   if (hit) {
-    logger.info("topic cache hit", { topicKey: t.topicKey, date });
+    logger.info("topic cache hit", { topicKey: cacheKey, date });
     // A hit is a search not paid for. Recorded at zero cost so the saving shows in the ledger —
     // the hit rate is one of the numbers the cost work needs.
     await meter({
@@ -205,7 +211,7 @@ async function getCachedOrFetch(
       provider: "perplexity",
       model: PERPLEXITY_MODEL,
       requests: 0,
-      extra: { topic: t.topic, topic_key: t.topicKey, cache: "hit" },
+      extra: { topic: t.topic, topic_key: cacheKey, cache: "hit", primer: t.isPrimer },
     });
     return { content: hit.content as string, sources: (hit.sources ?? []) as ReportSource[] };
   }
@@ -217,8 +223,8 @@ async function getCachedOrFetch(
         {
           recency: t.recency,
           system: SYSTEM_PROMPT,
-          contextSize: "medium",
-          meta: { topic: t.topic, topic_key: t.topicKey, cache: "miss" },
+          contextSize: t.isPrimer ? "high" : "medium",
+          meta: { topic: t.topic, topic_key: cacheKey, cache: "miss", primer: t.isPrimer },
         },
         meter,
       ),
@@ -228,10 +234,10 @@ async function getCachedOrFetch(
   const { error: writeErr } = await db
     .from("topic_news_cache")
     .upsert(
-      { topic_key: t.topicKey, date, content: result.content, sources: result.sources },
+      { topic_key: cacheKey, date, content: result.content, sources: result.sources },
       { onConflict: "topic_key,date", ignoreDuplicates: true },
     );
-  if (writeErr) logger.warn("topic cache write failed", { topicKey: t.topicKey, error: writeErr.message });
+  if (writeErr) logger.warn("topic cache write failed", { topicKey: cacheKey, error: writeErr.message });
   return { content: result.content, sources: result.sources };
 }
 
