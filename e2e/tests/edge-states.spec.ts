@@ -92,6 +92,40 @@ test.describe("states that cannot be reached by clicking", () => {
   });
 });
 
+// Signs in as the demo but tells the app it is an ordinary reader, with `patch` applied to its
+// preferences. An ordinary reader's screens save things, so every write is refused before it leaves
+// the browser — reads only.
+async function enterAsReader(page: Page, patch: Record<string, unknown>): Promise<void> {
+  await page.route("**/rest/v1/**", (route) =>
+    route.request().method() === "GET" ? route.fallback() : route.abort(),
+  );
+  await page.route("**/rest/v1/preferences*", async (route) => {
+    if (route.request().method() !== "GET") return route.abort();
+    const res = await route.fetch();
+    const rows = (await res.json()) as Record<string, unknown>[];
+    const patched = rows.map((r) => ({ ...r, is_demo: false, ...patch }));
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(patched) });
+  });
+  await enterDemo(page);
+}
+
+test.describe("choosing a language", () => {
+  test("replaying the setup starts on the language screen", async ({ page }) => {
+    await stubTable(page, "reports", [COMPLETE_REPORT]);
+    await stubTable(page, "podcast_episodes", []);
+    await enterAsReader(page, { language: "en" });
+
+    await expect(page.locator('[data-tour="topic"]')).toBeVisible();
+    await page.getByRole("link", { name: "Prefs" }).click();
+    await page.getByRole("button", { name: /see how this was set up/i }).click();
+    await expect(page.getByRole("radio", { name: /español/i })).toBeVisible();
+
+    // Choosing switches the screen at once, before Continue.
+    await page.getByRole("radio", { name: /español/i }).click();
+    await expect(page.getByText("Elige tu idioma")).toBeVisible();
+  });
+});
+
 test.describe("a reader in Spanish", () => {
   test("gets the whole app in Spanish, with topic names translated", async ({ page }) => {
     // Nothing may be written from here: this signs in as the demo but tells the app it is an
