@@ -68,7 +68,7 @@ export const generatePodcast = task({
         payload.turns ??
         (await withDiagnostics("podcast-script", () =>
           writeScript(
-            markdown!,
+            spokenInput(sections) ?? markdown!,
             sections.map((s) => ({ heading: s.topic, isPrimer: Boolean(s.isPrimer) })),
             recap,
             meter,
@@ -109,6 +109,15 @@ export const generatePodcast = task({
     }
   },
 });
+
+// What the script writer reads: each section's heading and prose, without the per-section source
+// lists the report markdown carries. Those lists were ~2/3 of the script step's input (measured
+// 2026-10-03), and a web address is no use in audio — the prose already names its outlets.
+// Null for an old report with no structured sections, which then falls back to its markdown.
+function spokenInput(sections: { topic: string; summary: string }[]): string | null {
+  if (sections.length === 0) return null;
+  return sections.map((s) => `## ${s.topic}\n\n${s.summary.trim()}`).join("\n\n");
+}
 
 // Render the dialogue as a readable transcript for the `script` column / any transcript UI.
 function renderTranscript(turns: DialogueTurn[]): string {

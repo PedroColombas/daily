@@ -16,7 +16,10 @@ import type { FetchedTopic } from "../jobs/fetch-news";
 //   • Model: Opus (MODELS.synthesis). A guard rejects a degraded (stubbed/short-changed) response.
 // ─────────────────────────────────────────────────────────────────────────────
 
-// Static — identical for every user + run, so it sits in `system` with cache_control.
+// Static — identical for every user + run. Deliberately NOT marked for prompt caching: measured
+// 2026-10-03, the cache was written on every brief and read on none (one synthesis per reader per
+// day never lands inside the five-minute window), and this prompt is ~5% of what synthesis reads,
+// so even a perfect hit rate would save almost nothing.
 // (Opus only caches a prefix once it's >=4096 tokens; below that this silently no-ops.)
 const SYNTHESIS_SYSTEM = `You are the synthesis engine for a personalised daily news briefing. You receive pre-fetched, per-topic research and turn it into a single report.
 
@@ -79,13 +82,18 @@ export async function synthesize(
     recency: t.recency,
     primer: t.isPrimer,
     content: t.content,
-    sources: t.sources,
+    // The outlet behind each citation, in order — Perplexity's [1] is the first. The model only
+    // needs these to name outlets in the prose ("Reuters reported…"); the full sources (titles,
+    // URLs, dates) are re-attached by index in code below. Passing them whole was ~3/4 of
+    // everything synthesis read (measured 2026-10-03) for no use.
+    sources: t.sources.map((s) => outletOf(s.url)),
   }));
 
   const userMessage =
     `Catch-up depth (for primer topics): ${prefs.context_depth}\n` +
     `Exclusions: ${prefs.exclusions || "none"}\n\n` +
-    `Topics (JSON array; use each item's "index" as topic_index). Items with "primer": true are new to the reader — write those as a catch-up:\n` +
+    `Topics (JSON array; use each item's "index" as topic_index). Items with "primer": true are new to the reader — write those as a catch-up. ` +
+    `Each item's "sources" names the outlet behind each citation in its content, in order — [1] is the first:\n` +
     `${JSON.stringify(topicsForModel)}\n\n` +
     "Write the report now.";
 
@@ -105,7 +113,7 @@ export async function synthesize(
         format: { type: "json_schema", schema: SYNTHESIS_SCHEMA },
         effort: "medium",
       },
-      system: [{ type: "text", text: SYNTHESIS_SYSTEM, cache_control: { type: "ephemeral" } }],
+      system: SYNTHESIS_SYSTEM,
       messages: [{ role: "user", content: userMessage }],
     })
     .finalMessage();
@@ -169,6 +177,15 @@ export async function synthesize(
   }
 
   return { content: { sections }, markdown: renderReportMarkdown(sections) };
+}
+
+// "https://www.reuters.com/world/…" -> "reuters.com". Falls back to the raw string if it isn't a URL.
+function outletOf(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return url;
+  }
 }
 
 // Render the report markdown in code from the finished sections — heading, the model's prose, then a

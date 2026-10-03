@@ -31,6 +31,7 @@ Rules:
 - Ground every claim in the report. Don't invent facts. Attribute to outlets by name, and when a source first comes up, briefly work in what it is and how trustworthy it is, spoken naturally — e.g. "...and that's from Nature, the peer-reviewed journal, so it's well-grounded", or "the Financial Times reported...". Only vouch for outlets you genuinely recognise; if a source is unfamiliar or looks low-quality, say so plainly rather than implying authority.
 - Write for the ear: say dates and numbers naturally, expand symbols, and NEVER read out URLs.
 - Cover the report's topics in order, and match its depth — a short report makes a short episode. Don't pad.
+- Stay within the word budget given with the report. When the report holds more than fits, keep the developments that matter most and leave the rest out, rather than rushing through everything.
 - If the prompt lists the report's sections with indices, set each turn's "section" to the 0-based index of the section that turn covers. The opening welcome takes the first section's index; the closing sign-off takes the last.
 - Sections marked [catch-up] are NEW to the listener. Open those by briefly framing it as a get-up-to-speed — the host flags that it's a new area ("this one's new for you, so let's set the scene") and the expert lays out the essential background before moving to the latest. Keep it natural and short; don't belabour it.
 - If a "while you were away" recap is provided, place it AFTER that opening welcome + preview turn: the host gives a brief "here's what you've missed since last time" catch-up built from it, then moves into today's topics. So the order is always: welcome + topic preview, THEN the catch-up, THEN the topics. Keep the catch-up short.`;
@@ -59,6 +60,20 @@ const PODCAST_SCHEMA = {
   additionalProperties: false,
 };
 
+// Length. Speech is charged by the minute and was the single biggest cost line (a 14-minute episode
+// on 2026-10-03), so the script gets a budget: about 10 minutes for a full brief, at the 150 words a
+// minute the player's duration estimate also assumes. Scaled down for fewer topics so a short brief
+// isn't padded to fill the time.
+export const PODCAST_TARGET_MINUTES = 10;
+const WORDS_PER_MINUTE = 150;
+const OPENING_AND_CLOSE_WORDS = 150;
+const WORDS_PER_TOPIC = 340;
+
+export function podcastWordBudget(topics: number, hasRecap: boolean): number {
+  const wanted = OPENING_AND_CLOSE_WORDS + WORDS_PER_TOPIC * Math.max(1, topics) + (hasRecap ? 100 : 0);
+  return Math.min(PODCAST_TARGET_MINUTES * WORDS_PER_MINUTE, wanted);
+}
+
 interface PodcastScript {
   turns: DialogueTurn[];
 }
@@ -81,6 +96,11 @@ export async function writeScript(
     : "";
 
   const started = Date.now();
+  const budget = podcastWordBudget(sections.length, Boolean(recap));
+  const lengthNote = `\n\nLength: about ${budget} words in total — roughly ${Math.round(
+    budget / WORDS_PER_MINUTE,
+  )} minutes spoken.`;
+
   const message = await anthropic().messages.create({
     model: MODELS.podcastScript,
     max_tokens: 8000,
@@ -92,7 +112,7 @@ export async function writeScript(
     messages: [
       {
         role: "user",
-        content: `Here is today's report. Write the two-person interview script.\n\n${markdown}${sectionList}${recapBlock}`,
+        content: `Here is today's report. Write the two-person interview script.\n\n${markdown}${sectionList}${recapBlock}${lengthNote}`,
       },
     ],
   });
@@ -103,7 +123,12 @@ export async function writeScript(
     model: MODELS.podcastScript,
     ...anthropicUsage(message),
     durationMs: Date.now() - started,
-    extra: { sections: sections.length, with_recap: Boolean(recap), effort: "medium" },
+    extra: {
+      sections: sections.length,
+      with_recap: Boolean(recap),
+      effort: "medium",
+      word_budget: budget,
+    },
   });
 
   const parsed = JSON.parse(firstText(message.content)) as PodcastScript;

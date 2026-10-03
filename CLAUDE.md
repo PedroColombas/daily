@@ -50,6 +50,9 @@ not an afterthought.
 - **Synthesis model** — Opus 4.8 (`MODELS.synthesis`). Sonnet 4.6 was tried as a cost saving and
   reverted — it stubbed sections on primer-heavy first briefs. Worth revisiting only with a proper
   before/after on quality.
+- **Podcast length ~10 minutes** for a full brief, set as a word budget in
+  `trigger/src/lib/podcast-script.ts` and scaled down for fewer topics. Speech is charged by
+  the minute and was the biggest single cost line, so length is a cost decision, not just style.
 - Audio stored in **Supabase Storage**, private bucket, namespaced
   `podcast-audio/{user_id}/{report_id}.mp3`.
 - **One Perplexity query per topic** (not one composite). This determines report
