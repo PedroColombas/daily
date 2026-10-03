@@ -4,8 +4,8 @@ import { useReports } from "../hooks/useReports";
 import type { ReportSummary } from "../hooks/useReports";
 import { usePreferences } from "../hooks/usePreferences";
 import { Coachmarks } from "../components/Coachmarks";
-
-const WEEKDAYS = ["M", "T", "W", "T", "F", "S", "S"];
+import { useLanguage, useTopicLabel } from "../i18n/LanguageProvider";
+import { capitalise } from "../lib/report-format";
 
 function pad(n: number): string {
   return String(n).padStart(2, "0");
@@ -23,12 +23,12 @@ function monthCells(year: number, month: number): (number | null)[] {
   return cells;
 }
 
-function rowDateParts(date: string) {
+function rowDateParts(date: string, locale: string) {
   const d = new Date(`${date}T00:00:00`);
   return {
-    weekday: d.toLocaleDateString(undefined, { weekday: "short" }),
+    weekday: d.toLocaleDateString(locale, { weekday: "short" }),
     day: d.getDate(),
-    month: d.toLocaleDateString(undefined, { month: "short" }),
+    month: d.toLocaleDateString(locale, { month: "short" }),
   };
 }
 
@@ -36,6 +36,7 @@ export function History() {
   const { reports, loading } = useReports();
   const { prefs, markTipsSeen } = usePreferences();
   const navigate = useNavigate();
+  const { t, locale } = useLanguage();
 
   const now = new Date();
   const [view, setView] = useState({ year: now.getFullYear(), month: now.getMonth() });
@@ -60,27 +61,26 @@ export function History() {
     });
   }
 
-  const monthLabel = new Date(view.year, view.month, 1).toLocaleDateString(undefined, {
-    month: "long",
-    year: "numeric",
-  });
+  const monthLabel = capitalise(
+    new Date(view.year, view.month, 1).toLocaleDateString(locale, { month: "long", year: "numeric" }),
+  );
 
   return (
     <div className="relative h-full">
       {/* Calendar — fixed behind the sheet */}
       <div ref={calRef} className="absolute inset-x-0 top-0 px-5 pt-4">
-        <h1 className="text-[26px] font-bold tracking-tight">History</h1>
+        <h1 className="text-[26px] font-bold tracking-tight">{t.history.title}</h1>
 
         <div className="mt-4 flex items-center justify-between">
           <span className="text-[15px] font-bold">{monthLabel}</span>
           <div className="flex items-center gap-4">
-            <button onClick={() => shiftMonth(-1)} aria-label="Previous month" className="text-[var(--ink)]">
+            <button onClick={() => shiftMonth(-1)} aria-label={t.history.prevMonth} className="text-[var(--ink)]">
               <Chevron dir="left" />
             </button>
             <button
               onClick={() => canNext && shiftMonth(1)}
               disabled={!canNext}
-              aria-label="Next month"
+              aria-label={t.history.nextMonth}
               className={canNext ? "text-[var(--ink)]" : "text-[var(--faint)] opacity-40"}
             >
               <Chevron dir="right" />
@@ -89,7 +89,7 @@ export function History() {
         </div>
 
         <div className="mt-3 grid grid-cols-7">
-          {WEEKDAYS.map((d, i) => (
+          {t.history.weekdays.map((d, i) => (
             <span key={i} className="text-center text-[10.5px] font-semibold text-[var(--faint)]">
               {d}
             </span>
@@ -116,7 +116,7 @@ export function History() {
           })}
         </div>
 
-        <p className="mt-3 text-center text-[11.5px] text-[var(--faint)]">Tap a date to open its report</p>
+        <p className="mt-3 text-center text-[11.5px] text-[var(--faint)]">{t.history.tapDate}</p>
       </div>
 
       {/* Recent-reports sheet — scrolls up over the calendar */}
@@ -129,17 +129,17 @@ export function History() {
             </div>
             <div className="flex items-baseline justify-between py-3">
               <span className="text-[11px] font-bold uppercase tracking-[1.2px] text-[var(--faint)]">
-                Recent reports
+                {t.history.recent}
               </span>
-              <span className="text-[12px] text-[var(--faint)]">{reports.length} saved</span>
+              <span className="text-[12px] text-[var(--faint)]">{t.history.saved(reports.length)}</span>
             </div>
           </div>
 
           {loading ? (
-            <p className="py-6 text-center text-[13px] text-[var(--faint)]">Loading…</p>
+            <p className="py-6 text-center text-[13px] text-[var(--faint)]">{t.common.loading}</p>
           ) : reports.length === 0 ? (
             <p className="py-6 text-center text-[13px] text-[var(--muted)]">
-              Your past reports will appear here.
+              {t.history.empty}
             </p>
           ) : (
             <div className="flex flex-col gap-2.5">
@@ -165,16 +165,16 @@ export function History() {
               key: "history-calendar",
               target: '[data-tour="history-calendar"]',
               placement: "below", // sit under the calendar, pointing up
-              title: "Every brief is saved",
-              body: "Highlighted days have a brief — tap one to reopen it. Use the arrows to browse past months.",
+              title: t.history.tips.calendarTitle,
+              body: t.history.tips.calendarBody,
             },
             {
               key: "history-list",
               target: '[data-tour="history-row"]',
               enabled: reports.length > 0,
               placement: "above", // sit above the cards (over the calendar), pointing down — never covers them
-              title: "Open any day's brief",
-              body: "Tap a card to read that day's brief. An accent bar marks unread ones; the mic icon means it has a podcast.",
+              title: t.history.tips.listTitle,
+              body: t.history.tips.listBody,
             },
           ]}
         />
@@ -205,7 +205,9 @@ function ReportRow({
   onOpen: () => void;
   tour?: string;
 }) {
-  const parts = rowDateParts(report.date);
+  const { t, locale } = useLanguage();
+  const topicLabel = useTopicLabel();
+  const parts = rowDateParts(report.date, locale);
   return (
     <button
       onClick={onOpen}
@@ -226,9 +228,9 @@ function ReportRow({
         <div className="flex items-center gap-2">
           <span className="h-1.5 w-1.5 flex-none rounded-full bg-[var(--accent)]" />
           <span className="text-[13.5px] font-bold">
-            {report.topicCount} {report.topicCount === 1 ? "topic" : "topics"}
+            {t.history.topics(report.topicCount)}
           </span>
-          {report.read && <span className="text-[11px] text-[var(--faint)]">· Read</span>}
+          {report.read && <span className="text-[11px] text-[var(--faint)]">· {t.history.read}</span>}
         </div>
         {report.categories.length > 0 && (
           <div className="flex flex-wrap items-center gap-1.5">
@@ -237,7 +239,7 @@ function ReportRow({
                 key={c}
                 className="rounded-full border border-[var(--line)] px-2 py-0.5 text-[11px] text-[var(--muted)]"
               >
-                {c}
+                {topicLabel(c)}
               </span>
             ))}
             {report.categories.length > 2 && (

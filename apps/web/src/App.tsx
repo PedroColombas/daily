@@ -1,4 +1,4 @@
-import { lazy, Suspense, useRef, useState } from "react";
+import { lazy, Suspense, useLayoutEffect, useRef, useState } from "react";
 import { Routes, Route, useLocation, type Location } from "react-router-dom";
 import { AnimatePresence, motion } from "motion/react";
 import { useAuth } from "./auth/AuthProvider";
@@ -8,6 +8,7 @@ import { FullPlayer } from "./components/FullPlayer";
 import { Onboarding } from "./pages/Onboarding";
 import { SetupContext } from "./lib/setup";
 import { Login } from "./pages/Login";
+import { useLanguage, useT } from "./i18n/LanguageProvider";
 
 // Lazy — the reading view pulls in react-markdown, which we don't want in the initial bundle.
 const Report = lazy(() => import("./pages/Report").then((m) => ({ default: m.Report })));
@@ -34,6 +35,16 @@ function AuthedApp() {
   const [finishedOnboarding, setFinishedOnboarding] = useState(false);
   // Replaying the wizard on request, rather than because this is a first run.
   const [replayingSetup, setReplayingSetup] = useState(false);
+
+  // Show the account's language once it loads. A layout effect, so the first screen paints in the
+  // right language rather than flashing the device's last one. The demo is always English: its
+  // briefs are, and a Spanish frame around English briefs would look broken.
+  const { showLanguage } = useLanguage();
+  const accountLanguage = !prefs ? null : prefs.is_demo ? "en" : prefs.language === "es" ? "es" : "en";
+  useLayoutEffect(() => {
+    if (accountLanguage) showLanguage(accountLanguage, !prefs?.is_demo);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accountLanguage, showLanguage]);
 
   if (loading || !prefs) return <Splash />;
   if (startedEmpty.current === null) startedEmpty.current = prefs.genres.length === 0;
@@ -97,5 +108,6 @@ function AuthedRoutes() {
 }
 
 function Splash() {
-  return <div className="flex h-full items-center justify-center text-[var(--faint)]">Loading…</div>;
+  const t = useT();
+  return <div className="flex h-full items-center justify-center text-[var(--faint)]">{t.common.loading}</div>;
 }

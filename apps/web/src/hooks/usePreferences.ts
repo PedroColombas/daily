@@ -17,7 +17,10 @@ const EDITABLE_COLUMNS = [
   "delivery_hour",
   "walkthrough_seen",
   "topic_order",
+  "topic_labels",
 ] as const;
+// Not here: `language`, which is written on its own by the LanguageProvider (see there for why),
+// and `tips_seen`, written by markTipsSeen below.
 
 function editableSubset(prefs: Preferences): Partial<Preferences> {
   const out: Record<string, unknown> = {};

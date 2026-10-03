@@ -2,6 +2,7 @@ import { anthropic, MODELS, firstText } from "./anthropic";
 import { anthropicUsage, noMeter, type Meter } from "./usage";
 import type { Preferences, ReportContent, ReportSection } from "@shared/types";
 import type { FetchedTopic } from "../jobs/fetch-news";
+import { LANGUAGE_NAME, readerLanguage } from "./language";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Report synthesis — DESIGNED WITH THE OWNER. Pure LLM logic (no Trigger/DB deps) so it
@@ -89,7 +90,18 @@ export async function synthesize(
     sources: t.sources.map((s) => outletOf(s.url)),
   }));
 
+  // The reader's language (see lib/language.ts). The research is in whatever language the search
+  // returned — usually English — so for anyone else the report is written, not just translated.
+  const language = readerLanguage(prefs.language);
+  const languageNote =
+    language === "en"
+      ? ""
+      : `Language: write every heading and summary in ${LANGUAGE_NAME[language]}. The research below ` +
+        `is mostly in English; carry its facts over faithfully. Keep outlet names as they are, and ` +
+        `write the notes on what each outlet is in the same language as the rest.\n`;
+
   const userMessage =
+    languageNote +
     `Catch-up depth (for primer topics): ${prefs.context_depth}\n` +
     `Exclusions: ${prefs.exclusions || "none"}\n\n` +
     `Topics (JSON array; use each item's "index" as topic_index). Items with "primer": true are new to the reader — write those as a catch-up. ` +
@@ -128,6 +140,7 @@ export async function synthesize(
     extra: {
       topics: topics.length,
       primers: topics.filter((t) => t.isPrimer).length,
+      language,
       stop_reason: message.stop_reason,
       effort: "medium",
     },
@@ -176,7 +189,7 @@ export async function synthesize(
     );
   }
 
-  return { content: { sections }, markdown: renderReportMarkdown(sections) };
+  return { content: { sections, language }, markdown: renderReportMarkdown(sections) };
 }
 
 // "https://www.reuters.com/world/…" -> "reuters.com". Falls back to the raw string if it isn't a URL.

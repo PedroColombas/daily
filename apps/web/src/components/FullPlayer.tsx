@@ -4,6 +4,8 @@ import { usePlayer } from "../player/PlayerProvider";
 import type { PlayerEpisode } from "../player/PlayerProvider";
 import { formatTime } from "../lib/format-time";
 import { PlayIcon, PauseIcon } from "./ui/icons";
+import { useLanguage } from "../i18n/LanguageProvider";
+import { capitalise } from "../lib/report-format";
 
 // Full-screen player. Slides up from the bottom when expanded; swipe down (or the chevron)
 // to dismiss. The sheet itself is the PlayerSheet child, mounted only while expanded so its
@@ -20,6 +22,7 @@ export function FullPlayer() {
 function PlayerSheet({ episode }: { episode: PlayerEpisode }) {
   const { isPlaying, currentTime, duration, rate, toggle, seek, skip, setRate, collapse } =
     usePlayer();
+  const { t, locale } = useLanguage();
 
   const [showSpeed, setShowSpeed] = useState(false);
   const speedDrag = useRef<{ x: number; rate: number } | null>(null);
@@ -34,8 +37,8 @@ function PlayerSheet({ episode }: { episode: PlayerEpisode }) {
   const activeChapter = episode.chapters.reduce((acc, ch, i) => (frac >= ch.fraction ? i : acc), 0);
   const currentChapterTitle = episode.chapters[activeChapter]?.title;
   const d = new Date(`${episode.date}T00:00:00`);
-  const weekday = d.toLocaleDateString(undefined, { weekday: "long" });
-  const dayMonth = d.toLocaleDateString(undefined, { day: "numeric", month: "long" });
+  const weekday = capitalise(d.toLocaleDateString(locale, { weekday: "long" }));
+  const dayMonth = d.toLocaleDateString(locale, { day: "numeric", month: "long" });
   const minutes = Math.max(1, Math.round((duration || episode.durationSeconds || 0) / 60));
 
   function onScrub(e: MouseEvent<HTMLDivElement>) {
@@ -92,13 +95,13 @@ function PlayerSheet({ episode }: { episode: PlayerEpisode }) {
 
         {/* Top bar */}
         <div className="flex flex-none items-center justify-between">
-          <button onClick={collapse} aria-label="Collapse player" className="flex h-9 w-9 items-center justify-center">
+          <button onClick={collapse} aria-label={t.player.collapse} className="flex h-9 w-9 items-center justify-center">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M6 9.5 L12 15.5 L18 9.5" />
             </svg>
           </button>
           <span className="text-[11.5px] font-semibold uppercase tracking-[1.8px] text-[var(--muted)]">
-            Now Playing
+            {t.player.nowPlaying}
           </span>
           <span className="h-9 w-9" />
         </div>
@@ -106,7 +109,7 @@ function PlayerSheet({ episode }: { episode: PlayerEpisode }) {
         {/* Typographic cover */}
         <div className="mt-3 flex aspect-square w-full flex-col justify-between rounded-3xl bg-[var(--ink)] p-6 text-[var(--paper)] shadow-[0_16px_34px_-12px_rgba(45,32,20,0.5)]">
           <span className="text-[11.5px] font-semibold uppercase tracking-[2px] text-[var(--accent)]">
-            Daily Report
+            {t.player.cover}
           </span>
           <div className="text-[33px] font-bold leading-[1.03] tracking-tight">
             {weekday}
@@ -126,8 +129,8 @@ function PlayerSheet({ episode }: { episode: PlayerEpisode }) {
 
         {/* Title + meta */}
         <div className="mt-5 flex-none">
-          <div className="text-[19px] font-bold tracking-tight">Your Daily Report</div>
-          <div className="text-[13px] text-[var(--muted)]">AI narration · {minutes} min</div>
+          <div className="text-[19px] font-bold tracking-tight">{t.player.title}</div>
+          <div className="text-[13px] text-[var(--muted)]">{t.player.meta(minutes)}</div>
         </div>
 
         {/* Current section + segmented scrubber */}
@@ -166,7 +169,7 @@ function PlayerSheet({ episode }: { episode: PlayerEpisode }) {
           <SkipButton dir="back" onClick={() => skip(-15)} />
           <button
             onClick={toggle}
-            aria-label={isPlaying ? "Pause" : "Play"}
+            aria-label={isPlaying ? t.player.pause : t.player.play}
             className="flex h-[68px] w-[68px] items-center justify-center rounded-full bg-[var(--accent)] text-[var(--on-accent)] shadow-[0_6px_16px_rgba(192,81,43,0.4)]"
           >
             {isPlaying ? <PauseIcon size={22} /> : <PlayIcon size={22} />}
@@ -213,10 +216,11 @@ function PlayerSheet({ episode }: { episode: PlayerEpisode }) {
 }
 
 function SkipButton({ dir, onClick }: { dir: "back" | "fwd"; onClick: () => void }) {
+  const t = useLanguage().t;
   return (
     <button
       onClick={onClick}
-      aria-label={dir === "back" ? "Back 15 seconds" : "Forward 15 seconds"}
+      aria-label={dir === "back" ? t.player.back15 : t.player.forward15}
       className="relative flex h-12 w-12 items-center justify-center text-[var(--ink)]"
     >
       <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">

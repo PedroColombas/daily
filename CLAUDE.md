@@ -61,6 +61,25 @@ not an afterthought.
 - App Store path: build PWA-first; wrap with Capacitor later if needed. No code
   changes required for that, so don't pre-optimise for it.
 
+### Languages — English and Spain Spanish (2026-10)
+The reader picks a language on the very first screen, before the welcome and the wizard, and can
+change it in Preferences (`preferences.language`, migration 0016). It sets two things:
+
+- **The interface.** Every string lives in `apps/web/src/i18n/strings.ts`, one object per language,
+  with `es` typed against `en` so a missing string is a build error. Dates follow the app's language.
+- **What the pipeline writes** — report, catch-up, podcast script, and the voices (Castilian accent).
+  The prompts stay in English and a non-English reader gets one added line naming the language
+  (`trigger/src/lib/language.ts`); English prompts are unchanged. A report records the language it
+  was written in (`content.language`), and its podcast follows that, not the current setting.
+
+It does **not** change what is searched. Retrieval stays shared per `(topic, day)` across readers;
+a Spanish reader's brief is written in Spanish from the same research. Topics keep one internal
+(English) name for the same reason, and are only *shown* translated (`apps/web/src/i18n/topics.ts`,
+plus `preferences.topic_labels` for live-suggested ones). Which sources a topic draws on, local or
+global, is a separate, open question that belongs with source preferences.
+
+The demo is English-only: the language screen and setting are hidden for it.
+
 ### Topic model
 1. **Genre** — a CONTAINER, not a section. User picks up to 5 genres to browse; a genre alone
    produces nothing. (Changed after user testing — genres used to become broad sections too, which
@@ -102,7 +121,7 @@ daily/
 │   ├── jobs/                  # one file per stage + the cron + the demo seeders
 │   ├── lib/                   # Perplexity, Anthropic, TTS, audio assembly, concurrency
 │   └── fixtures/              # demo + TTS-test data
-├── supabase/migrations/       # 0001–0015; schema, RLS, storage, usage ledger
+├── supabase/migrations/       # 0001–0016; schema, RLS, storage, usage ledger, language
 ├── shared/                    # types + the topic planner, used by BOTH app and pipeline
 ├── e2e/                       # Playwright, run against the deployed app
 └── docs/                      # architecture diagram + design/ (Claude Design exports)
@@ -117,7 +136,7 @@ contains, so the app's preview and the pipeline's real section list cannot drift
 on Vercel, the pipeline is deployed to Trigger.dev, and a public demo account serves
 seeded briefs with all paid calls gated off.
 
-- **Data** — 15 migrations. RLS on every table; reports and podcasts are read-only from
+- **Data** — 16 migrations. RLS on every table; reports and podcasts are read-only from
   the frontend, the pipeline writes as service_role. Private `podcast-audio` bucket.
 - **Pipeline** — `fetch-news` (Perplexity, one query per topic, shared per-day cache for catalogue
   topics and their first-time primers) →

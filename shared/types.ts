@@ -25,6 +25,10 @@ export type SubtopicMap = Record<string, string[]>;
 // 'latest' = no primer, 'quick' = short primer, 'full' = thorough catch-up.
 export type ContextDepth = 'latest' | 'quick' | 'full';
 
+// The language a reader reads in: the app's interface, and what the pipeline writes (report,
+// catch-up, podcast). Searching is unaffected — see migration 0016. 'es' is Spain Spanish.
+export type Language = 'en' | 'es';
+
 export interface Preferences {
   id: string;
   user_id: string;
@@ -42,6 +46,8 @@ export interface Preferences {
   tips_seen: string[];            // keys of one-time coach-mark tips the user has dismissed
   is_demo: boolean;               // public demo account — blocked from all paid API calls
   topic_order: string[];          // user-chosen section order (keys); [] = specific-first default
+  language: Language;             // interface + written-output language (migration 0016)
+  topic_labels: Record<string, string>; // display labels for live-suggested topics, keyed by internal name
   updated_at: string;
 }
 
@@ -86,6 +92,7 @@ export interface ReportRecap {
 export interface ReportContent {
   sections: ReportSection[];
   recap?: ReportRecap | null;
+  language?: Language;            // what it was written in; absent on briefs from before 0016 = 'en'
 }
 
 export interface Report {

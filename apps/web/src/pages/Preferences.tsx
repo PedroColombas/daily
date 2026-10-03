@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import type { Preferences as Prefs } from "@shared/types";
+import type { Language, Preferences as Prefs } from "@shared/types";
 import { usePreferences } from "../hooks/usePreferences";
 import { useLatestReport } from "../hooks/useLatestReport";
 import { requestTodayBrief } from "../lib/api";
@@ -11,6 +11,8 @@ import { Coachmarks } from "../components/Coachmarks";
 import { MAX_TOPICS } from "../lib/preferences-options";
 import { useSetup } from "../lib/setup";
 import { readTheme, applyTheme, type Theme } from "../lib/theme";
+import { useLanguage } from "../i18n/LanguageProvider";
+import type { Strings } from "../i18n/strings";
 
 function SectionLabel({ children }: { children: ReactNode }) {
   return (
@@ -29,22 +31,23 @@ export function Preferences() {
   }
 
   const { prefs, loading, status, update, markTipsSeen } = usePreferences();
+  const { t, lang, chooseLanguage } = useLanguage();
   const setup = useSetup();
   const { report } = useLatestReport();
   const [topicsChanged, setTopicsChanged] = useState(false);
   const [regen, setRegen] = useState<"idle" | "submitting" | "done">("idle");
 
   if (loading || !prefs) {
-    return <div className="px-6 py-10 text-[14px] text-[var(--faint)]">Loading your preferences…</div>;
+    return <div className="px-6 py-10 text-[14px] text-[var(--faint)]">{t.prefs.loading}</div>;
   }
 
   const statusLabel =
     status === "saving"
-      ? "Saving…"
+      ? t.prefs.saving
       : status === "saved"
-        ? "Saved"
+        ? t.prefs.saved
         : status === "error"
-          ? "Couldn't save"
+          ? t.prefs.saveError
           : "";
 
   // Only prompt to regenerate when today's brief already exists and was built with the OLD topics.
@@ -82,7 +85,7 @@ export function Preferences() {
   return (
     <section className="flex flex-col gap-7 px-5 pb-10 pt-7">
       <div className="flex items-baseline justify-between px-1">
-        <h1 className="text-[28px] font-bold tracking-tight">Preferences</h1>
+        <h1 className="text-[28px] font-bold tracking-tight">{t.prefs.title}</h1>
         {statusLabel && (
           <span
             className={`text-[12.5px] font-medium ${
@@ -97,14 +100,10 @@ export function Preferences() {
       {/* Your topics — each is a section; drag to reorder, tap to edit, or add */}
       <div className="flex flex-col gap-3" data-tour="prefs-topics">
         <div className="px-1">
-          <SectionLabel>Your topics</SectionLabel>
-          <p className="mt-1 text-[12.5px] text-[var(--muted)]">
-            Each is a section in your brief. Drag to reorder, tap to edit, or add your own.
-          </p>
+          <SectionLabel>{t.prefs.topicsLabel}</SectionLabel>
+          <p className="mt-1 text-[12.5px] text-[var(--muted)]">{t.prefs.topicsBlurb}</p>
           {prefs.is_demo && (
-            <p className="mt-1.5 text-[12.5px] font-medium text-[var(--accent)]">
-              Have a play — you're in the demo, changes here aren't saved.
-            </p>
+            <p className="mt-1.5 text-[12.5px] font-medium text-[var(--accent)]">{t.prefs.demoNote}</p>
           )}
         </div>
         {topicsChanged && todayComplete && (
@@ -120,8 +119,8 @@ export function Preferences() {
       {/* Delivery time */}
       <div className="flex items-center justify-between px-1" data-tour="prefs-delivery">
         <div className="flex flex-col gap-0.5">
-          <span className="text-[14.5px] font-semibold">Delivery time</span>
-          <span className="text-[12px] text-[var(--muted)]">When your brief lands each day, in your local time</span>
+          <span className="text-[14.5px] font-semibold">{t.prefs.deliveryTitle}</span>
+          <span className="text-[12px] text-[var(--muted)]">{t.prefs.deliveryBlurb}</span>
         </div>
         <DeliveryTimeSelect
           valueUtc={prefs.delivery_hour}
@@ -132,22 +131,38 @@ export function Preferences() {
       {/* Daily podcast */}
       <div className="flex items-center justify-between px-1" data-tour="prefs-podcast">
         <div className="flex flex-col gap-0.5">
-          <span className="text-[14.5px] font-semibold">Daily podcast</span>
-          <span className="text-[12px] text-[var(--muted)]">A conversational audio version of your report</span>
+          <span className="text-[14.5px] font-semibold">{t.prefs.podcastTitle}</span>
+          <span className="text-[12px] text-[var(--muted)]">{t.prefs.podcastBlurb}</span>
         </div>
         <Toggle checked={prefs.podcast_enabled} onChange={(podcast_enabled) => update({ podcast_enabled })} />
       </div>
+
+      {/* Language — the app switches at once; briefs follow from the next one, since a brief is
+          written once. Not offered in the demo, which is English-only: its briefs are. */}
+      {!prefs.is_demo && (
+        <div className="flex items-center justify-between gap-3 px-1">
+          <div className="flex flex-col gap-0.5">
+            <span className="text-[14.5px] font-semibold">{t.prefs.languageTitle}</span>
+            <span className="text-[12px] text-[var(--muted)]">{t.prefs.languageBlurb}</span>
+          </div>
+          <LanguageSelect value={lang} onChange={(next) => void chooseLanguage(next, true)} />
+        </div>
+      )}
 
       {/* Appearance — a device setting, not an account one, so it is the one control on this page
           that is not backed by the preferences table. See lib/theme.ts. */}
       <div className="flex items-center justify-between px-1">
         <div className="flex flex-col gap-0.5">
-          <span className="text-[14.5px] font-semibold">Appearance</span>
+          <span className="text-[14.5px] font-semibold">{t.prefs.appearanceTitle}</span>
           <span className="text-[12px] text-[var(--muted)]">
-            {theme === "system" ? "Following your device" : `Always ${theme}`}
+            {theme === "system"
+              ? t.prefs.followingDevice
+              : theme === "light"
+                ? t.prefs.alwaysLight
+                : t.prefs.alwaysDark}
           </span>
         </div>
-        <AppearanceSelect value={theme} onChange={setTheme} />
+        <AppearanceSelect value={theme} onChange={setTheme} words={t.prefs} />
       </div>
 
       {/* Replay of the setup wizard — otherwise the screen that does the most to explain the
@@ -157,10 +172,8 @@ export function Preferences() {
           onClick={setup.openSetup}
           className="rounded-2xl border border-dashed border-[var(--line)] px-4 py-3.5 text-left active:opacity-70"
         >
-          <span className="block text-[14.5px] font-semibold">See how this was set up</span>
-          <span className="mt-0.5 block text-[12px] text-[var(--muted)]">
-            Walk through the setup wizard again
-          </span>
+          <span className="block text-[14.5px] font-semibold">{t.prefs.replayTitle}</span>
+          <span className="mt-0.5 block text-[12px] text-[var(--muted)]">{t.prefs.replayBlurb}</span>
         </button>
       )}
 
@@ -175,20 +188,20 @@ export function Preferences() {
               key: "prefs-topics",
               target: '[data-tour="prefs-topics"]',
               placement: "below", // sit under the topic cards, pointing up, so it never covers them
-              title: "Your topics",
-              body: `These are the sections of your brief. Drag to reorder, tap to edit, or add up to ${MAX_TOPICS}.`,
+              title: t.prefs.tips.topicsTitle,
+              body: t.prefs.tips.topicsBody(MAX_TOPICS),
             },
             {
               key: "prefs-delivery",
               target: '[data-tour="prefs-delivery"]',
-              title: "Delivery time",
-              body: "Choose when your brief lands each morning, in your local time.",
+              title: t.prefs.tips.deliveryTitle,
+              body: t.prefs.tips.deliveryBody,
             },
             {
               key: "prefs-podcast",
               target: '[data-tour="prefs-podcast"]',
-              title: "Daily podcast",
-              body: "Turn on an audio version and it'll appear on Today, ready to play.",
+              title: t.prefs.tips.podcastTitle,
+              body: t.prefs.tips.podcastBody,
             },
           ]}
         />
@@ -197,7 +210,16 @@ export function Preferences() {
   );
 }
 
-function AppearanceSelect({ value, onChange }: { value: Theme; onChange: (t: Theme) => void }) {
+function AppearanceSelect({
+  value,
+  onChange,
+  words,
+}: {
+  value: Theme;
+  onChange: (t: Theme) => void;
+  words: Strings["prefs"];
+}) {
+  const label = { system: words.themeAuto, light: words.themeLight, dark: words.themeDark };
   return (
     <div className="flex gap-1 rounded-full bg-[var(--line)]/60 p-0.5">
       {(["system", "light", "dark"] as const).map((t) => (
@@ -205,11 +227,36 @@ function AppearanceSelect({ value, onChange }: { value: Theme; onChange: (t: The
           key={t}
           onClick={() => onChange(t)}
           aria-pressed={value === t}
-          className={`rounded-full px-3 py-1.5 text-[12.5px] font-medium capitalize ${
+          className={`rounded-full px-3 py-1.5 text-[12.5px] font-medium ${
             value === t ? "bg-[var(--surface)] text-[var(--ink)] shadow-sm" : "text-[var(--muted)]"
           }`}
         >
-          {t === "system" ? "Auto" : t}
+          {label[t]}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// Each language named in itself, as on the language screen.
+function LanguageSelect({ value, onChange }: { value: Language; onChange: (l: Language) => void }) {
+  const options: { value: Language; label: string }[] = [
+    { value: "en", label: "English" },
+    { value: "es", label: "Español" },
+  ];
+  return (
+    <div className="flex flex-none gap-1 rounded-full bg-[var(--line)]/60 p-0.5">
+      {options.map((o) => (
+        <button
+          key={o.value}
+          lang={o.value}
+          onClick={() => onChange(o.value)}
+          aria-pressed={value === o.value}
+          className={`rounded-full px-3 py-1.5 text-[12.5px] font-medium ${
+            value === o.value ? "bg-[var(--surface)] text-[var(--ink)] shadow-sm" : "text-[var(--muted)]"
+          }`}
+        >
+          {o.label}
         </button>
       ))}
     </div>
@@ -225,11 +272,12 @@ function RegenBanner({
   onRegenerate: () => void;
   onDismiss: () => void;
 }) {
+  const t = useLanguage().t;
   if (state === "done") {
     return (
       <div className="rounded-2xl border border-[var(--accent)]/40 bg-[var(--accent)]/8 p-3.5">
         <p className="text-[13px] font-medium leading-relaxed text-[var(--ink)]">
-          Regenerating today's brief — it'll appear on Today in a minute or two.
+          {t.prefs.regenDone}
         </p>
       </div>
     );
@@ -237,11 +285,8 @@ function RegenBanner({
   return (
     <div className="flex flex-col gap-3 rounded-2xl border border-[var(--accent)]/40 bg-[var(--accent)]/8 p-3.5">
       <div>
-        <p className="text-[13.5px] font-semibold text-[var(--ink)]">Topics changed</p>
-        <p className="mt-0.5 text-[12.5px] leading-relaxed text-[var(--muted)]">
-          Today's brief used your previous topics. Regenerate it now, or your changes apply from
-          tomorrow.
-        </p>
+        <p className="text-[13.5px] font-semibold text-[var(--ink)]">{t.prefs.regenTitle}</p>
+        <p className="mt-0.5 text-[12.5px] leading-relaxed text-[var(--muted)]">{t.prefs.regenBody}</p>
       </div>
       <div className="flex items-center gap-1">
         <button
@@ -249,10 +294,10 @@ function RegenBanner({
           disabled={state === "submitting"}
           className="rounded-full bg-[var(--accent)] px-4 py-2 text-[13px] font-semibold text-[var(--on-accent)] disabled:opacity-50"
         >
-          {state === "submitting" ? "Starting…" : "Regenerate today"}
+          {state === "submitting" ? t.prefs.regenStarting : t.prefs.regenNow}
         </button>
         <button onClick={onDismiss} className="px-3 py-2 text-[13px] font-semibold text-[var(--muted)]">
-          Wait till tomorrow
+          {t.prefs.regenWait}
         </button>
       </div>
     </div>

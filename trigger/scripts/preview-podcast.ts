@@ -4,10 +4,13 @@
 //
 // Run from the trigger/ directory:
 //   PowerShell:  $env:ANTHROPIC_API_KEY="sk-ant-..."; npm run preview:podcast
+// In Spanish:   $env:PREVIEW_LANGUAGE="es"; npm run preview:podcast
+//   (the sample report is English, as most research is — the script is still written in Spanish)
 //
 // (The voices themselves are tuned later, with an OpenAI key, when you can hear them.)
 
 import { writeScript } from "../src/lib/podcast-script";
+import { readerLanguage } from "../src/lib/language";
 
 // Stand-in for a synthesised report (what generate-report would hand to the podcast step).
 const SAMPLE_REPORT = `# Your briefing — 21 June 2026
@@ -37,11 +40,17 @@ async function main(): Promise<void> {
 
   console.log("\n=== Podcast interview preview (script only — no audio) ===\n");
   // Mark the first topic as a catch-up so the preview shows the primer framing.
-  const turns = await writeScript(SAMPLE_REPORT, [
-    { heading: "AI accelerator export rules", isPrimer: true },
-    { heading: "Fusion energy milestone", isPrimer: false },
-    { heading: "Open-weights model release", isPrimer: false },
-  ]);
+  const turns = await writeScript(
+    SAMPLE_REPORT,
+    [
+      { heading: "AI accelerator export rules", isPrimer: true },
+      { heading: "Fusion energy milestone", isPrimer: false },
+      { heading: "Open-weights model release", isPrimer: false },
+    ],
+    undefined,
+    undefined,
+    readerLanguage(process.env.PREVIEW_LANGUAGE),
+  );
 
   for (const turn of turns) {
     const label = turn.speaker === "host" ? "HOST" : "EXPERT";

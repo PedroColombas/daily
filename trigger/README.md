@@ -54,12 +54,19 @@ prompt. A guard rejects a degraded response rather than shipping a stubbed secti
 read-aloud — then synthesises each speaker in parallel and assembles the episode with
 ffmpeg, adding the intro sting and per-topic chapters.
 
+**Languages.** A reader in Spanish gets their report, catch-up and podcast written in Spain
+Spanish, and the voices told to use a Castilian accent. The search is the same either way — shared
+per topic and day — so only the writing steps change. The prompts stay in English, and a
+non-English reader gets one added line naming the language (`src/lib/language.ts`).
+
 Both prompts can be run locally against a single Anthropic key, no database and no Trigger:
 
 ```bash
 npm run preview:synthesis
 npm run preview:podcast
 ```
+
+Set `PREVIEW_LANGUAGE=es` first to see either one in Spanish.
 
 ## Measuring cost
 

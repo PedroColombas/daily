@@ -1,12 +1,14 @@
 import { NavLink } from "react-router-dom";
 import type { ReactNode } from "react";
+import { useT } from "../i18n/LanguageProvider";
+import type { Strings } from "../i18n/strings";
 
-type Tab = { to: string; label: string; end: boolean; icon: (active: boolean) => ReactNode };
+type Tab = { to: string; label: keyof Strings["nav"]; end: boolean; icon: (active: boolean) => ReactNode };
 
 const TABS: Tab[] = [
   {
     to: "/",
-    label: "Today",
+    label: "today",
     end: true,
     icon: () => (
       <>
@@ -19,7 +21,7 @@ const TABS: Tab[] = [
   },
   {
     to: "/preferences",
-    label: "Prefs",
+    label: "prefs",
     end: false,
     icon: (active) => (
       <>
@@ -32,7 +34,7 @@ const TABS: Tab[] = [
   },
   {
     to: "/history",
-    label: "History",
+    label: "history",
     end: false,
     icon: () => (
       <>
@@ -43,7 +45,7 @@ const TABS: Tab[] = [
   },
   {
     to: "/profile",
-    label: "Profile",
+    label: "profile",
     end: false,
     icon: () => (
       <>
@@ -55,6 +57,7 @@ const TABS: Tab[] = [
 ];
 
 export function BottomNav() {
+  const t = useT();
   return (
     <nav className="sticky bottom-0 grid grid-cols-4 border-t border-[var(--line)] bg-[var(--paper)]/95 pb-[env(safe-area-inset-bottom)] backdrop-blur">
       {TABS.map((tab) => (
@@ -84,7 +87,7 @@ export function BottomNav() {
                 {tab.icon(isActive)}
               </svg>
               <span className={`text-[10.5px] ${isActive ? "font-semibold" : "font-medium"}`}>
-                {tab.label}
+                {t.nav[tab.label]}
               </span>
             </>
           )}

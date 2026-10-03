@@ -18,6 +18,33 @@ const SCHEMA = {
   },
 } as const;
 
+// The Spanish variant: the same English names (they are the internal keys), each with the label a
+// reader in Spain is shown.
+const LABELLED_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["subtopics"],
+  properties: {
+    subtopics: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["name", "label"],
+        properties: {
+          name: { type: "string" },
+          label: { type: "string" },
+        },
+      },
+    },
+  },
+} as const;
+
+const SPANISH_LABELS =
+  `\n\nThe reader reads in Spanish (Spain). For each subtopic give "name" — the English label, ` +
+  `following the rules above — and "label": how a newspaper in Spain would name that same section ` +
+  `(sentence case, as short as the English).`;
+
 const SYSTEM = `You suggest subtopics a news reader can follow within a broad news genre.
 Favour DURABLE THEMES that are currently prominent in the news — ongoing areas of development and active storylines — NOT one-off events or dated headlines. A good subtopic still makes sense a month from now (e.g. "AI Regulation", not "Tuesday's Senate vote").
 Rules:
@@ -79,24 +106,48 @@ function cleanList(list: unknown, genre: string): string[] {
   return out;
 }
 
+export interface Suggestions {
+  subtopics: string[];
+  labels?: Record<string, string>;
+}
+
 // Distil clean, durable theme chips — optionally informed by fresh news context.
-async function distillThemes(genre: string, context: string, apiKey: string): Promise<string[]> {
+async function distillThemes(
+  genre: string,
+  context: string,
+  apiKey: string,
+  language: "en" | "es",
+): Promise<Suggestions> {
   const client = new Anthropic({ apiKey });
   const userContent = context
     ? `Genre: ${genre}\n\nRecent news context (what's currently active):\n${context}\n\nFrom this, propose the subtopics.`
     : `Genre: ${genre}`;
 
+  const spanish = language === "es";
   const response = await client.messages.create({
     model: MODEL,
-    max_tokens: 300,
-    system: SYSTEM,
+    max_tokens: spanish ? 600 : 300,
+    system: spanish ? SYSTEM + SPANISH_LABELS : SYSTEM,
     messages: [{ role: "user", content: userContent }],
     // Structured output constrains the reply to the schema above.
-    output_config: { format: { type: "json_schema", schema: SCHEMA } },
+    output_config: { format: { type: "json_schema", schema: spanish ? LABELLED_SCHEMA : SCHEMA } },
   } as Anthropic.Messages.MessageCreateParamsNonStreaming);
 
   const parsed = JSON.parse(firstText(response.content)) as { subtopics?: unknown };
-  return cleanList(parsed.subtopics, genre);
+  if (!spanish) return { subtopics: cleanList(parsed.subtopics, genre) };
+
+  const items = Array.isArray(parsed.subtopics) ? parsed.subtopics : [];
+  const labels: Record<string, string> = {};
+  for (const item of items as { name?: unknown; label?: unknown }[]) {
+    if (typeof item?.name === "string" && typeof item.label === "string" && item.label.trim()) {
+      labels[item.name.trim()] = item.label.trim();
+    }
+  }
+  const subtopics = cleanList(
+    items.map((i) => (i as { name?: unknown })?.name),
+    genre,
+  );
+  return { subtopics, labels: Object.fromEntries(subtopics.filter((s) => labels[s]).map((s) => [s, labels[s]])) };
 }
 
 /**
@@ -109,9 +160,10 @@ export async function suggestSubtopics(
   genre: string,
   anthropicKey: string,
   perplexityKey?: string,
-): Promise<string[]> {
+  language: "en" | "es" = "en",
+): Promise<Suggestions> {
   const trimmed = genre.trim();
-  if (!trimmed) return [];
+  if (!trimmed) return { subtopics: [] };
 
   let context = "";
   if (perplexityKey) {
@@ -122,5 +174,5 @@ export async function suggestSubtopics(
     }
   }
 
-  return distillThemes(trimmed, context, anthropicKey);
+  return distillThemes(trimmed, context, anthropicKey, language);
 }

@@ -62,9 +62,9 @@ test.describe("the path a visitor walks", () => {
 
     // Both directions, so this catches the specificity trap: the override has to beat the
     // prefers-color-scheme media query whichever way the device is set.
-    await page.getByRole("button", { name: "dark", exact: true }).click();
+    await page.getByRole("button", { name: "Dark", exact: true }).click();
     const dark = await bg();
-    await page.getByRole("button", { name: "light", exact: true }).click();
+    await page.getByRole("button", { name: "Light", exact: true }).click();
     const light = await bg();
     expect(dark).not.toBe(light);
 
@@ -74,6 +74,16 @@ test.describe("the path a visitor walks", () => {
 
     await page.getByRole("link", { name: "Prefs" }).click();
     await page.getByRole("button", { name: "Auto", exact: true }).click();
+  });
+
+  test("the demo is in English, with no language to change", async ({ page }) => {
+    // Its briefs are English, so the frame around them must be too — whatever the visitor's device
+    // last used. The language setting is hidden rather than offered and ignored.
+    await expect(page.locator('[data-tour="topic"]')).toBeVisible();
+    await expect(page.locator("html")).toHaveAttribute("lang", "en");
+    await page.getByRole("link", { name: "Prefs" }).click();
+    await expect(page.locator('[data-tour="prefs-topics"]')).toBeVisible();
+    await expect(page.getByRole("button", { name: "Español" })).toHaveCount(0);
   });
 
   test("nothing a visitor changes is saved", async ({ page }) => {

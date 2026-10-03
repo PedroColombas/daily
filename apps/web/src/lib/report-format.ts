@@ -1,23 +1,33 @@
 import type { User } from "@supabase/supabase-js";
 
-// "2026-06-27" -> "Saturday · 27 June" (parsed as local, not UTC midnight).
-export function formatReportDate(date: string): string {
+// "2026-06-27" -> "Saturday · 27 June", or "sábado · 27 de junio" (parsed as local, not UTC
+// midnight). `locale` is the app's (LanguageProvider), so dates match the interface language.
+export function formatReportDate(date: string, locale?: string): string {
   const d = new Date(`${date}T00:00:00`);
-  const weekday = d.toLocaleDateString(undefined, { weekday: "long" });
-  const rest = d.toLocaleDateString(undefined, { day: "numeric", month: "long" });
+  const weekday = d.toLocaleDateString(locale, { weekday: "long" });
+  const rest = d.toLocaleDateString(locale, { day: "numeric", month: "long" });
   return `${weekday} · ${rest}`;
 }
 
 // The same date for use inside a sentence: "2026-06-27" -> "Saturday 27 June".
-export function formatReportDateInline(date: string): string {
-  return formatReportDate(date).replace(" · ", " ");
+export function formatReportDateInline(date: string, locale?: string): string {
+  return formatReportDate(date, locale).replace(" · ", " ");
 }
 
-export function greeting(now: Date = new Date()): string {
+// "sábado" -> "Sábado", for where a date stands alone as a title. Spanish lower-cases weekdays and
+// months mid-sentence, so this is applied at the point of display, never in the formatter.
+export function capitalise(text: string): string {
+  return text.charAt(0).toLocaleUpperCase() + text.slice(1);
+}
+
+export function greeting(
+  words: { morning: string; afternoon: string; evening: string },
+  now: Date = new Date(),
+): string {
   const h = now.getHours();
-  if (h < 12) return "Good morning";
-  if (h < 18) return "Good afternoon";
-  return "Good evening";
+  if (h < 12) return words.morning;
+  if (h < 18) return words.afternoon;
+  return words.evening;
 }
 
 // First name from auth metadata, else the email's leading segment, title-cased.

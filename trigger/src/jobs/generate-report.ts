@@ -85,6 +85,7 @@ export const generateReport = task({
             writeRecap(
               missed.map((m) => ({ date: m.date, markdown: m.markdown ?? "" })),
               meter,
+              content.language,
             ),
           );
           if (summary) recap = { summary, days: missed.length };

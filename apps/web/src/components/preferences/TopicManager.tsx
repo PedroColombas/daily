@@ -14,6 +14,7 @@ import {
   removeEntry,
   type TopicEntry,
 } from "../../lib/topic-actions";
+import { useT, useTopicLabel } from "../../i18n/LanguageProvider";
 
 // The report's topics, managed directly: drag to reorder, tap a card to edit, or delete via the
 // trash icon on each card. Topics are subtopics (a focus within a genre) or your own words.
@@ -26,6 +27,8 @@ export function TopicManager({
 }) {
   const [entries, setEntries] = useState<TopicEntry[]>(() => topicEntries(prefs));
   const [editing, setEditing] = useState<TopicEntry | "new" | null>(null);
+  const t = useT();
+  const label = useTopicLabel(prefs.topic_labels);
 
   // Re-sync the list when the SET of topics changes (add/edit/delete) — not on a bare reorder.
   const setSignal = topicEntries(prefs).map(entryKey).sort().join("|");
@@ -41,9 +44,9 @@ export function TopicManager({
     <div className="flex flex-col gap-2">
       <div className="flex items-center justify-between px-1">
         <span className="text-[12px] text-[var(--muted)]">
-          {count} of {MAX_TOPICS} topics
+          {t.topics.count(count, MAX_TOPICS)}
         </span>
-        {atCap && <span className="text-[11.5px] text-[var(--faint)]">Delete one to add more</span>}
+        {atCap && <span className="text-[11.5px] text-[var(--faint)]">{t.topics.deleteToAdd}</span>}
       </div>
 
       {entries.length > 0 && (
@@ -66,15 +69,17 @@ export function TopicManager({
                 {i + 1}
               </span>
               <button onClick={() => setEditing(e)} className="flex min-w-0 flex-1 flex-col text-left">
-                <span className="truncate text-[14px] font-semibold leading-snug">{entryLabel(e)}</span>
-                <span className="text-[11.5px] text-[var(--faint)]">{entryTypeLabel(e)}</span>
+                <span className="truncate text-[14px] font-semibold leading-snug">{entryLabel(e, label)}</span>
+                <span className="text-[11.5px] text-[var(--faint)]">
+                  {entryTypeLabel(e, t.topics.ownWords, label)}
+                </span>
               </button>
               <button
                 onClick={(ev) => {
                   ev.stopPropagation();
                   update(removeEntry(prefs, e));
                 }}
-                aria-label={`Delete ${entryLabel(e)}`}
+                aria-label={t.topics.deleteAria(entryLabel(e, label))}
                 className="flex h-8 w-8 flex-none items-center justify-center rounded-full text-[var(--faint)] active:bg-red-500/10 active:text-red-600"
               >
                 <TrashIcon />
@@ -89,7 +94,7 @@ export function TopicManager({
         disabled={atCap}
         className="rounded-2xl border border-dashed border-[var(--line)] py-3 text-[13.5px] font-semibold text-[var(--muted)] active:opacity-60 disabled:opacity-40"
       >
-        + Add topic
+        {t.topics.add}
       </button>
 
       {editing && (
@@ -124,6 +129,8 @@ function TopicEditSheet({
   onClose: () => void;
 }) {
   const isNew = entry === null;
+  const t = useT();
+  const label = useTopicLabel(prefs.topic_labels);
   const [mode, setMode] = useState<"genre" | "custom">(entry?.kind === "custom" ? "custom" : "genre");
   const [genre, setGenre] = useState(entry?.kind === "subtopic" ? entry.genre : "");
   const [sub, setSub] = useState(entry?.kind === "subtopic" ? entry.sub : "");
@@ -151,7 +158,7 @@ function TopicEditSheet({
         className="mx-auto w-full max-w-md rounded-t-3xl border-t border-[var(--line)] bg-[var(--paper)] p-5 pb-8"
       >
         <div className="mx-auto mb-4 h-1 w-9 rounded-full bg-[var(--line)]" />
-        <h3 className="text-[17px] font-bold tracking-tight">{isNew ? "Add a topic" : "Edit topic"}</h3>
+        <h3 className="text-[17px] font-bold tracking-tight">{isNew ? t.topics.addTitle : t.topics.editTitle}</h3>
 
         {isNew && (
           <div className="mt-3 flex gap-1 rounded-full bg-[var(--line)]/60 p-0.5">
@@ -163,7 +170,7 @@ function TopicEditSheet({
                   mode === m ? "bg-[var(--surface)] text-[var(--ink)] shadow-sm" : "text-[var(--muted)]"
                 }`}
               >
-                {m === "genre" ? "From a genre" : "Your own words"}
+                {m === "genre" ? t.topics.fromGenre : t.topics.ownWords}
               </button>
             ))}
           </div>
@@ -172,7 +179,9 @@ function TopicEditSheet({
         {mode === "genre" ? (
           <div className="mt-4 flex flex-col gap-4">
             <div>
-              <span className="text-[11px] font-semibold uppercase tracking-[1px] text-[var(--faint)]">Genre</span>
+              <span className="text-[11px] font-semibold uppercase tracking-[1px] text-[var(--faint)]">
+                {t.topics.genre}
+              </span>
               <div className="mt-2 flex flex-wrap gap-2">
                 {GENRES.map((g) => (
                   <button
@@ -187,7 +196,7 @@ function TopicEditSheet({
                         : "border border-[var(--line)] text-[var(--muted)]"
                     }`}
                   >
-                    {g}
+                    {label(g)}
                   </button>
                 ))}
               </div>
@@ -195,11 +204,9 @@ function TopicEditSheet({
             {genre && (
               <div>
                 <span className="text-[11px] font-semibold uppercase tracking-[1px] text-[var(--faint)]">
-                  Subtopic
+                  {t.topics.subtopic}
                 </span>
-                <p className="mt-1 text-[11.5px] text-[var(--muted)]">
-                  Pick a focus within {genre} — or add it in your own words instead.
-                </p>
+                <p className="mt-1 text-[11.5px] text-[var(--muted)]">{t.topics.pickFocus(label(genre))}</p>
                 <div className="mt-2 flex flex-wrap gap-2">
                   {subChips.map((sg) => (
                     <button
@@ -211,7 +218,7 @@ function TopicEditSheet({
                           : "border border-[var(--line)] text-[var(--muted)]"
                       }`}
                     >
-                      {sg}
+                      {label(sg)}
                     </button>
                   ))}
                 </div>
@@ -220,12 +227,14 @@ function TopicEditSheet({
           </div>
         ) : (
           <div className="mt-4">
-            <span className="text-[11px] font-semibold uppercase tracking-[1px] text-[var(--faint)]">Topic</span>
+            <span className="text-[11px] font-semibold uppercase tracking-[1px] text-[var(--faint)]">
+              {t.topics.topic}
+            </span>
             <textarea
               value={text}
               onChange={(e) => setText(e.target.value)}
               rows={2}
-              placeholder="Anything, in your own words — e.g. what China is doing in chip development"
+              placeholder={t.topics.placeholderLong}
               className="mt-2 w-full resize-none rounded-xl border border-[var(--line)] bg-[var(--surface)] px-3.5 py-2.5 text-[14px] outline-none placeholder:text-[var(--faint)] focus:border-[var(--accent)]"
             />
           </div>
@@ -240,7 +249,7 @@ function TopicEditSheet({
               }}
               className="rounded-full border border-red-500/40 px-4 py-2 text-[14px] font-semibold text-red-600 active:bg-red-500/10 dark:border-red-400/40 dark:text-red-400"
             >
-              Remove
+              {t.common.remove}
             </button>
           )}
           <div className="flex-1" />
@@ -248,14 +257,14 @@ function TopicEditSheet({
             onClick={onClose}
             className="rounded-full px-4 py-2 text-[14px] font-semibold text-[var(--muted)] active:bg-[var(--line)]/50"
           >
-            Cancel
+            {t.common.cancel}
           </button>
           <button
             onClick={save}
             disabled={!canSave}
             className="rounded-full bg-[var(--accent)] px-5 py-2 text-[14px] font-semibold text-[var(--on-accent)] disabled:opacity-40"
           >
-            Save
+            {t.common.save}
           </button>
         </div>
       </div>

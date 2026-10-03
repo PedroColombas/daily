@@ -12,6 +12,7 @@ import { noMeter, type Meter, type UsageEvent } from "./usage";
 import { elevenSynthesizeDialogue, ELEVEN_MODEL, type ElevenVoice } from "./elevenlabs-tts";
 import { introMp3 } from "./intro-audio";
 import { encodeUniformMp3 } from "./audio-encode";
+import type { Language } from "@shared/types";
 
 // Podcast narration engine. ElevenLabs (multilingual_v2) is the quality path; OpenAI is the
 // fallback, used automatically when the ElevenLabs key is absent or a call fails — so the daily
@@ -45,6 +46,21 @@ const OPENAI_CAST: Record<string, SpeechOptions> = {
   },
 };
 
+// The same two voices for a Spanish episode, told to speak with a Castilian accent. Without it the
+// model's Spanish can drift toward a neutral Latin American one. The rest of each direction is unchanged.
+const CASTILIAN =
+  "Speak in Spanish with a Castilian accent from Spain — peninsular pronunciation, not Latin American. ";
+
+function castFor(language: Language): Record<string, SpeechOptions> {
+  if (language === "en") return OPENAI_CAST;
+  return Object.fromEntries(
+    Object.entries(OPENAI_CAST).map(([role, v]) => [
+      role,
+      { ...v, instructions: CASTILIAN + (v.instructions ?? "") },
+    ]),
+  );
+}
+
 // Female host + male expert (owner-chosen voices). To change, swap either voiceId with any voice
 // from your ElevenLabs dashboard (Voices → ⋯ → "Copy voice ID"). If an id is invalid the call
 // throws and we fall back to OpenAI, so podcasts keep working meanwhile.
@@ -63,7 +79,7 @@ const ELEVEN_CAST: Record<string, ElevenVoice> = {
 
 // Narrate a set of turns to a single voice track. Tries ElevenLabs first (when enabled and keyed),
 // falls back to OpenAI on any failure.
-async function narrate(turns: DialogueTurn[], meter: Meter): Promise<Buffer> {
+async function narrate(turns: DialogueTurn[], meter: Meter, language: Language): Promise<Buffer> {
   const started = Date.now();
   const useEleven = TTS_PROVIDER === "elevenlabs" && !!optionalEnv("ELEVENLABS_API_KEY");
   if (useEleven) {
@@ -85,9 +101,11 @@ async function narrate(turns: DialogueTurn[], meter: Meter): Promise<Buffer> {
     }
   }
   logger.info("TTS narrated via OpenAI");
-  const audio = await openaiSynthesizeDialogue(turns, OPENAI_CAST);
+  const audio = await openaiSynthesizeDialogue(turns, castFor(language));
+  const event = ttsEvent(turns);
   await meter({
-    ...ttsEvent(turns),
+    ...event,
+    extra: { ...event.extra, language },
     provider: "openai",
     model: TTS_MODEL,
     durationMs: Date.now() - started,
@@ -117,6 +135,7 @@ function ttsEvent(turns: DialogueTurn[]): Pick<UsageEvent, "stage" | "requests" 
 export async function synthesizeDialogue(
   turns: DialogueTurn[],
   meter: Meter = noMeter,
+  language: Language = "en",
 ): Promise<Buffer> {
   if (turns.length === 0) return Buffer.alloc(0);
 
@@ -124,8 +143,9 @@ export async function synthesizeDialogue(
   // BEFORE any catch-up recap — the script is structured welcome+preview → catch-up → topics.
   const split = 1;
 
-  const opening = await narrate(turns.slice(0, split), meter);
-  const rest = split < turns.length ? await narrate(turns.slice(split), meter) : Buffer.alloc(0);
+  const opening = await narrate(turns.slice(0, split), meter, language);
+  const rest =
+    split < turns.length ? await narrate(turns.slice(split), meter, language) : Buffer.alloc(0);
 
   try {
     // encodeUniformMp3 drops empty buffers, so an empty `rest` (few-turn episode) is safe.

@@ -41,11 +41,13 @@ function devSuggestApi(anthropicKey: string | undefined, perplexityKey: string |
             return;
           }
           const raw = await readBody(req);
-          const genre = String(JSON.parse(raw || "{}").genre ?? "");
+          const body = JSON.parse(raw || "{}");
+          const genre = String(body.genre ?? "");
+          const language = body.language === "es" ? "es" : "en";
           // Transpile + load the shared module on the fly (it imports the Anthropic SDK).
           const mod = await server.ssrLoadModule("/api/_lib/suggest.ts");
-          const subtopics = await mod.suggestSubtopics(genre, anthropicKey, perplexityKey);
-          res.end(JSON.stringify({ subtopics }));
+          const result = await mod.suggestSubtopics(genre, anthropicKey, perplexityKey, language);
+          res.end(JSON.stringify(result));
         } catch (err) {
           console.error("dev suggest-subtopics failed:", err);
           res.statusCode = 502;

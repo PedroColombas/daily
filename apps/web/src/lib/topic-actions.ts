@@ -11,12 +11,18 @@ export function entryKey(e: TopicEntry): string {
   return e.kind === "custom" ? `interest:${e.text}` : `sub:${e.genre}:${e.sub}`;
 }
 
-export function entryLabel(e: TopicEntry): string {
-  return e.kind === "custom" ? e.text : e.sub;
+// Display text for an entry. `label` turns an internal topic name into what the reader sees (their
+// language); custom interests are the reader's own words and are shown exactly as typed.
+export function entryLabel(e: TopicEntry, label: (name: string) => string = (n) => n): string {
+  return e.kind === "custom" ? e.text : label(e.sub);
 }
 
-export function entryTypeLabel(e: TopicEntry): string {
-  return e.kind === "custom" ? "Your own words" : e.genre;
+export function entryTypeLabel(
+  e: TopicEntry,
+  ownWords: string,
+  label: (name: string) => string = (n) => n,
+): string {
+  return e.kind === "custom" ? ownWords : label(e.genre);
 }
 
 // The user's topics, in report order (same source of truth as the pipeline).

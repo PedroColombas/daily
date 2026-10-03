@@ -2,9 +2,12 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import { useAuth, demoAvailable } from "../auth/AuthProvider";
 import { Logo } from "../components/Logo";
+import { useT } from "../i18n/LanguageProvider";
 
 export function Login() {
   const { signInWithEmail, signInWithGoogle, signInAsDemo } = useAuth();
+  // The sign-in screen speaks the language this device last used — there is no account yet to ask.
+  const t = useT().login;
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
@@ -44,9 +47,9 @@ export function Login() {
       {/* Wordmark + promise — vertically centred */}
       <div className="flex flex-1 flex-col items-center justify-center text-center">
         <Logo size={34} />
-        <h1 className="mt-5 text-[27px] font-bold leading-tight tracking-tight">Your day, briefed.</h1>
+        <h1 className="mt-5 text-[27px] font-bold leading-tight tracking-tight">{t.tagline}</h1>
         <p className="mt-3 max-w-[260px] text-[14.5px] leading-relaxed text-[var(--muted)]">
-          One personalised report each morning — your topics, summarised and ready to read or hear.
+          {t.blurb}
         </p>
       </div>
 
@@ -54,13 +57,15 @@ export function Login() {
       {status === "sent" ? (
         <div className="rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-5 text-center">
           <p className="text-[15px] leading-relaxed text-[var(--ink)]">
-            Check your inbox — a sign-in link is on its way to <strong>{email}</strong>.
+            {t.sentBefore}
+            <strong>{email}</strong>
+            {t.sentAfter}
           </p>
           <button
             onClick={() => setStatus("idle")}
             className="mt-3 text-[13.5px] font-semibold text-[var(--faint)]"
           >
-            Use a different email
+            {t.differentEmail}
           </button>
         </div>
       ) : (
@@ -70,12 +75,12 @@ export function Login() {
             className="flex w-full items-center justify-center gap-2.5 rounded-2xl border border-[var(--line)] bg-[var(--surface)] py-3.5 text-[15px] font-semibold"
           >
             <span className="text-base font-bold text-[var(--accent)]">G</span>
-            Continue with Google
+            {t.google}
           </button>
 
           <div className="flex items-center gap-3 py-1">
             <span className="h-px flex-1 bg-[var(--line)]" />
-            <span className="text-xs font-medium text-[var(--faint)]">or</span>
+            <span className="text-xs font-medium text-[var(--faint)]">{t.or}</span>
             <span className="h-px flex-1 bg-[var(--line)]" />
           </div>
 
@@ -85,7 +90,7 @@ export function Login() {
               required
               autoComplete="email"
               inputMode="email"
-              placeholder="you@example.com"
+              placeholder={t.emailPlaceholder}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="rounded-2xl border border-[var(--line)] bg-[var(--surface)] px-4 py-3.5 text-base outline-none placeholder:text-[var(--faint)] focus:border-[var(--accent)]"
@@ -95,7 +100,7 @@ export function Login() {
               disabled={status === "sending"}
               className="rounded-2xl bg-[var(--accent)] py-3.5 text-[15px] font-semibold text-[var(--on-accent)] disabled:opacity-50"
             >
-              {status === "sending" ? "Sending…" : "Continue with email"}
+              {status === "sending" ? t.sending : t.continueEmail}
             </button>
           </form>
 
@@ -105,7 +110,7 @@ export function Login() {
             <>
               <div className="flex items-center gap-3 py-1">
                 <span className="h-px flex-1 bg-[var(--line)]" />
-                <span className="text-xs font-medium text-[var(--faint)]">just looking?</span>
+                <span className="text-xs font-medium text-[var(--faint)]">{t.justLooking}</span>
                 <span className="h-px flex-1 bg-[var(--line)]" />
               </div>
               <button
@@ -113,14 +118,17 @@ export function Login() {
                 disabled={status === "sending"}
                 className="rounded-2xl border border-dashed border-[var(--accent)]/50 py-3.5 text-[15px] font-semibold text-[var(--accent)] disabled:opacity-50"
               >
-                View the demo — no signup
+                {t.demo}
               </button>
             </>
           )}
 
           <p className="mx-4 mt-2 text-center text-[11px] leading-relaxed text-[var(--faint)]">
-            By continuing you agree to our <span className="font-semibold text-[var(--ink)]">Terms</span> and{" "}
-            <span className="font-semibold text-[var(--ink)]">Privacy Policy</span>.
+            {t.termsBefore}
+            <span className="font-semibold text-[var(--ink)]">{t.terms}</span>
+            {t.and}
+            <span className="font-semibold text-[var(--ink)]">{t.privacy}</span>
+            {t.termsAfter}
           </p>
         </div>
       )}

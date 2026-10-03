@@ -4,6 +4,7 @@ import { BrowserRouter } from "react-router-dom";
 import { APP_BASE } from "./lib/routes";
 import { AuthProvider } from "./auth/AuthProvider";
 import { PlayerProvider } from "./player/PlayerProvider";
+import { LanguageProvider } from "./i18n/LanguageProvider";
 import { App } from "./App";
 import "./index.css";
 
@@ -14,9 +15,11 @@ createRoot(root).render(
   <StrictMode>
     <BrowserRouter basename={APP_BASE}>
       <AuthProvider>
-        <PlayerProvider>
-          <App />
-        </PlayerProvider>
+        <LanguageProvider>
+          <PlayerProvider>
+            <App />
+          </PlayerProvider>
+        </LanguageProvider>
       </AuthProvider>
     </BrowserRouter>
   </StrictMode>,

@@ -1,19 +1,28 @@
+import type { Language } from "@shared/types";
 import { SUBTOPIC_FALLBACK } from "./preferences-options";
 import { supabase } from "./supabase";
 
-const CACHE_PREFIX = "subtopics:";
+// Suggestions: internal names (always English — see i18n/topics.ts), plus their labels in the
+// reader's language when that isn't English.
+export interface SubtopicSuggestions {
+  subtopics: string[];
+  labels: Record<string, string>;
+}
+
+// English keeps the key it always had, so existing caches stay valid.
+const cachePrefix = (lang: Language) => (lang === "en" ? "subtopics:" : `subtopics:${lang}:`);
 
 function today(): string {
   return new Date().toISOString().slice(0, 10); // YYYY-MM-DD
 }
 
-function readCache(genre: string): string[] | null {
+function readCache(genre: string, lang: Language): SubtopicSuggestions | null {
   try {
-    const raw = localStorage.getItem(CACHE_PREFIX + genre);
+    const raw = localStorage.getItem(cachePrefix(lang) + genre);
     if (!raw) return null;
-    const cached = JSON.parse(raw) as { date: string; subtopics: string[] };
+    const cached = JSON.parse(raw) as { date: string; subtopics: string[]; labels?: Record<string, string> };
     if (cached.date === today() && Array.isArray(cached.subtopics) && cached.subtopics.length > 0) {
-      return cached.subtopics;
+      return { subtopics: cached.subtopics, labels: cached.labels ?? {} };
     }
   } catch {
     /* ignore malformed cache */
@@ -21,9 +30,9 @@ function readCache(genre: string): string[] | null {
   return null;
 }
 
-function writeCache(genre: string, subtopics: string[]): void {
+function writeCache(genre: string, lang: Language, result: SubtopicSuggestions): void {
   try {
-    localStorage.setItem(CACHE_PREFIX + genre, JSON.stringify({ date: today(), subtopics }));
+    localStorage.setItem(cachePrefix(lang) + genre, JSON.stringify({ date: today(), ...result }));
   } catch {
     /* storage full / unavailable — non-fatal */
   }
@@ -31,11 +40,15 @@ function writeCache(genre: string, subtopics: string[]): void {
 
 /**
  * Fetch subtopic suggestions for a genre from the server-side endpoint, cached
- * per genre for the day (the suggestions are trend-grounded, so once a day is plenty).
- * Falls back to the static map on any failure so the UI always has chips to show.
+ * per genre and language for the day (the suggestions are trend-grounded, so once a day is plenty).
+ * Falls back to the static map on any failure so the UI always has chips to show — the static
+ * chips are translated in the app, so they need no labels from here.
  */
-export async function fetchSubtopicSuggestions(genre: string): Promise<string[]> {
-  const cached = readCache(genre);
+export async function fetchSubtopicSuggestions(
+  genre: string,
+  lang: Language = "en",
+): Promise<SubtopicSuggestions> {
+  const cached = readCache(genre, lang);
   if (cached) return cached;
 
   try {
@@ -49,17 +62,18 @@ export async function fetchSubtopicSuggestions(genre: string): Promise<string[]>
         "content-type": "application/json",
         ...(token ? { authorization: `Bearer ${token}` } : {}),
       },
-      body: JSON.stringify({ genre }),
+      body: JSON.stringify({ genre, language: lang }),
     });
     if (!res.ok) throw new Error(`status ${res.status}`);
-    const data = (await res.json()) as { subtopics?: string[] };
+    const data = (await res.json()) as { subtopics?: string[]; labels?: Record<string, string> };
     if (Array.isArray(data.subtopics) && data.subtopics.length > 0) {
-      writeCache(genre, data.subtopics);
-      return data.subtopics;
+      const result = { subtopics: data.subtopics, labels: data.labels ?? {} };
+      writeCache(genre, lang, result);
+      return result;
     }
     throw new Error("empty suggestions");
   } catch {
-    return SUBTOPIC_FALLBACK[genre] ?? [];
+    return { subtopics: SUBTOPIC_FALLBACK[genre] ?? [], labels: {} };
   }
 }
 

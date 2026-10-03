@@ -8,6 +8,7 @@ import { useReport } from "../hooks/useReport";
 import { useAuth } from "../auth/AuthProvider";
 import { markReportRead } from "../lib/reads";
 import { formatReportDate, sourceHost } from "../lib/report-format";
+import { useLanguage, useTopicLabel } from "../i18n/LanguageProvider";
 
 // Body text sizes (S / M / L), cycled by the "Aa" control and remembered.
 const TEXT_SIZES = ["text-[15px]", "text-[16.5px]", "text-[18px]"];
@@ -36,6 +37,7 @@ export function Report() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { report, loading } = useReport(date);
+  const { t, locale } = useLanguage();
 
   // Opening the reading view marks the report read.
   useEffect(() => {
@@ -55,7 +57,7 @@ export function Report() {
 
   async function share() {
     if (!report?.markdown) return;
-    const payload = { title: `Daily — ${formatReportDate(report.date)}`, text: report.markdown };
+    const payload = { title: `Daily — ${formatReportDate(report.date, locale)}`, text: report.markdown };
     try {
       if (navigator.share) await navigator.share(payload);
       else await navigator.clipboard.writeText(report.markdown);
@@ -69,7 +71,7 @@ export function Report() {
       <div className="flex flex-none items-center justify-between border-b border-[var(--line)] bg-[var(--paper)]/95 px-3 py-2.5 backdrop-blur">
         <button
           onClick={() => navigate(-1)}
-          aria-label="Back"
+          aria-label={t.report.back}
           className="flex h-9 w-9 items-center justify-center rounded-full text-[var(--ink)]"
         >
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -79,7 +81,7 @@ export function Report() {
         <div className="flex items-center gap-1">
           <button
             onClick={cycleSize}
-            aria-label="Text size"
+            aria-label={t.report.textSize}
             className="flex h-9 items-center justify-center rounded-full px-3 text-[var(--ink)]"
           >
             <span className="text-[13px] font-bold">A</span>
@@ -88,7 +90,7 @@ export function Report() {
           {report?.markdown && (
             <button
               onClick={() => void share()}
-              aria-label="Share"
+              aria-label={t.report.share}
               className="flex h-9 w-9 items-center justify-center rounded-full text-[var(--ink)]"
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -102,11 +104,11 @@ export function Report() {
       </div>
 
       {loading ? (
-        <Centered>Loading…</Centered>
+        <Centered>{t.common.loading}</Centered>
       ) : !report ? (
-        <Centered>We couldn't find that report.</Centered>
+        <Centered>{t.report.notFound}</Centered>
       ) : report.status !== "complete" || !report.content ? (
-        <Centered>This report isn't ready yet.</Centered>
+        <Centered>{t.report.notReady}</Centered>
       ) : (
         <Article
           date={report.date}
@@ -127,6 +129,7 @@ function Article({
   sections: ReportSection[];
   bodySize: string;
 }) {
+  const { t, locale } = useLanguage();
   // Scroll to the section the user tapped on Today (e.g. /report/2026-06-27#s2).
   useEffect(() => {
     const hash = window.location.hash;
@@ -138,12 +141,10 @@ function Article({
   return (
     <div className="flex-1 overflow-y-auto px-6 pb-16 pt-5">
       <span className="text-[12px] font-semibold uppercase tracking-[1.8px] text-[var(--muted)]">
-        {formatReportDate(date)}
+        {formatReportDate(date, locale)}
       </span>
-      <h1 className="mt-1.5 text-[26px] font-bold leading-tight tracking-tight">Your brief</h1>
-      <span className="mt-1.5 block text-[13px] text-[var(--muted)]">
-        {sections.length} {sections.length === 1 ? "topic" : "topics"}
-      </span>
+      <h1 className="mt-1.5 text-[26px] font-bold leading-tight tracking-tight">{t.report.title}</h1>
+      <span className="mt-1.5 block text-[13px] text-[var(--muted)]">{t.report.topics(sections.length)}</span>
 
       <div className="mt-4 flex flex-col gap-7">
         {sections.map((s, i) => (
@@ -167,16 +168,18 @@ function Section({
   bodySize: string;
 }) {
   const [showSources, setShowSources] = useState(false);
+  const { t } = useLanguage();
+  const topicLabel = useTopicLabel();
   return (
     <div id={id} className="scroll-mt-20">
       <div className="flex items-center gap-2">
         <span className="h-1.5 w-1.5 flex-none rounded-full bg-[var(--accent)]" />
         <span className="text-[11.5px] font-semibold uppercase tracking-[1.4px] text-[var(--muted)]">
-          {section.category ?? "For you"}
+          {section.category ? topicLabel(section.category) : t.today.forYou}
         </span>
         {section.isPrimer && (
           <span className="rounded-full bg-[var(--accent)]/12 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[var(--accent)]">
-            New topic
+            {t.today.newTopic}
           </span>
         )}
       </div>
@@ -192,7 +195,7 @@ function Section({
             onClick={() => setShowSources((v) => !v)}
             className="text-[12.5px] font-semibold text-[var(--accent)]"
           >
-            Sources · {section.sources.length}
+            {t.report.sources(section.sources.length)}
             <span className="ml-1 text-[var(--faint)]">{showSources ? "▲" : "▾"}</span>
           </button>
           {showSources && <SourceList sources={section.sources} />}

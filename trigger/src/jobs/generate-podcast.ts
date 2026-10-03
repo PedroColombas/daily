@@ -5,6 +5,7 @@ import { writeScript } from "../lib/podcast-script";
 import { synthesizeDialogue, type DialogueTurn } from "../lib/tts";
 import { INTRO_SECONDS } from "../lib/intro-audio";
 import { createMeter } from "../lib/usage";
+import { readerLanguage } from "../lib/language";
 import type { ReportContent } from "@shared/types";
 
 const AUDIO_BUCKET = "podcast-audio";
@@ -29,6 +30,9 @@ export const generatePodcast = task({
     const content = report!.content as ReportContent | null;
     const sections = content?.sections ?? [];
     const recap = content?.recap?.summary;
+    // The episode is in the language its brief was written in — not the reader's current setting,
+    // which may have changed since. Briefs from before languages existed carry none: English.
+    const language = readerLanguage(content?.language);
 
     // Idempotency anchor: podcast_episodes.unique(report_id).
     const { data: existing } = await db
@@ -72,6 +76,7 @@ export const generatePodcast = task({
             sections.map((s) => ({ heading: s.topic, isPrimer: Boolean(s.isPrimer) })),
             recap,
             meter,
+            language,
           ),
         ));
       if (turns.length === 0) throw new Error("podcast script came back empty");
@@ -80,7 +85,7 @@ export const generatePodcast = task({
 
       // 2. Synthesise each turn in its speaker's voice; concatenate the segments in order.
       //    (ElevenLabs when configured, else OpenAI — the tts facade picks + falls back.)
-      const audio = await withDiagnostics("tts", () => synthesizeDialogue(turns, meter));
+      const audio = await withDiagnostics("tts", () => synthesizeDialogue(turns, meter, language));
 
       // 3. Upload to the private bucket, namespaced by user (service_role bypasses storage
       //    RLS). `audio_url` stores the PATH, not a URL — see schema + 0003_storage.sql.

@@ -1,5 +1,6 @@
 import { useCallback, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useT } from "../i18n/LanguageProvider";
 
 export interface Tip {
   key: string; // stable id, stored in tips_seen so it shows only once
@@ -30,6 +31,7 @@ export function Coachmarks({
   seen: string[];
   onSeen: (keys: string[]) => void;
 }) {
+  const words = useT();
   // Freeze the batch at mount: the tips eligible right now (applicable + not yet seen). Pages remount
   // on each tab visit, so a tip that only becomes eligible later still gets shown then.
   const [batch] = useState<Tip[]>(() =>
@@ -193,14 +195,14 @@ export function Coachmarks({
           <div className="flex items-center gap-3">
             {!last && (
               <button onClick={skip} className="text-[13px] font-medium text-[var(--faint)]">
-                Skip
+                {words.coach.skip}
               </button>
             )}
             <button
               onClick={advance}
               className="rounded-full bg-[var(--accent)] px-4 py-1.5 text-[13px] font-semibold text-[var(--on-accent)] active:opacity-80"
             >
-              {last ? "Got it" : "Next"}
+              {last ? words.coach.done : words.coach.next}
             </button>
           </div>
         </div>

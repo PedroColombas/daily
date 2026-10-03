@@ -19,14 +19,15 @@ export function localHourToUtc(local: number): number {
   return (((local + offsetHours()) % 24) + 24) % 24;
 }
 
-// Format a local whole hour (0–23) as a friendly local time, e.g. "7:00 AM" (respects locale).
-export function formatLocalHour(localHour: number): string {
+// Format a local whole hour (0–23) as a friendly local time, e.g. "7:00 AM" or "7:00", in the app's
+// language (see LanguageProvider's locale).
+export function formatLocalHour(localHour: number, locale?: string): string {
   const d = new Date();
   d.setHours(localHour, 0, 0, 0);
-  return d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  return d.toLocaleTimeString(locale ? [locale] : [], { hour: "numeric", minute: "2-digit" });
 }
 
 // Format a stored UTC delivery hour directly as the user's local time (for copy).
-export function formatDeliveryHour(utc: number): string {
-  return formatLocalHour(utcHourToLocal(utc));
+export function formatDeliveryHour(utc: number, locale?: string): string {
+  return formatLocalHour(utcHourToLocal(utc), locale);
 }

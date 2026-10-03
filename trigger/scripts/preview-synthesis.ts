@@ -4,10 +4,12 @@
 //
 // Run from the trigger/ directory:
 //   PowerShell:  $env:ANTHROPIC_API_KEY="sk-ant-..."; npm run preview:synthesis
+// In Spanish:   $env:PREVIEW_LANGUAGE="es"; npm run preview:synthesis
 
 import { synthesize } from "../src/lib/synthesis";
 import type { Preferences } from "@shared/types";
 import type { FetchedTopic } from "../src/jobs/fetch-news";
+import { readerLanguage } from "../src/lib/language";
 
 const prefs: Preferences = {
   id: "preview",
@@ -27,6 +29,8 @@ const prefs: Preferences = {
   tips_seen: [],
   is_demo: false,
   topic_order: [],
+  language: readerLanguage(process.env.PREVIEW_LANGUAGE),
+  topic_labels: {},
   updated_at: "2026-06-21T00:00:00Z",
 };
 

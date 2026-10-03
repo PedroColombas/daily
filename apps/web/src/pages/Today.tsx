@@ -20,6 +20,7 @@ import type { PlayerEpisode } from "../player/PlayerProvider";
 import { PlayIcon } from "../components/ui/icons";
 import { RecapCard } from "../components/RecapCard";
 import { Coachmarks } from "../components/Coachmarks";
+import { useLanguage, useTopicLabel } from "../i18n/LanguageProvider";
 
 // If an on-demand generation hasn't landed in this long of FOREGROUND time (background time is
 // excluded — see the visibility handler), stop waiting and show an error + retry. Generous, since
@@ -40,6 +41,8 @@ export function Today() {
   const { prefs, loading: prefsLoading, markTipsSeen } = usePreferences();
   const { play } = usePlayer();
   const navigate = useNavigate();
+  const { t, lang, locale } = useLanguage();
+  const topicLabel = useTopicLabel(prefs?.topic_labels);
 
   // Initialise from the reload bridge: if an on-demand generation was just kicked off (record still
   // fresh), resume the compiling state even though React state was lost on reload. Read once.
@@ -107,8 +110,10 @@ export function Today() {
     !!prefs?.podcast_enabled && !!brief && (!episode || episode.status === "failed");
 
   // A failure is worth reporting, but it should never cost access to briefs already in hand.
+  // A failed run's stored reason is a technical English message — only worth showing in English.
   const failureMessage =
-    genErrorMessage ?? (report?.status === "failed" ? report.error_message : undefined);
+    genErrorMessage ??
+    (report?.status === "failed" && lang === "en" ? report.error_message : undefined);
   const showFailure = (genError || (timedOut && waiting) || failedIsCurrent) && !errorDismissed;
 
   // Drop the optimistic flag once the brief actually completes.
@@ -186,7 +191,9 @@ export function Today() {
     } catch (err) {
       setGenerating(false);
       setGenError(true);
-      setGenErrorMessage(err instanceof Error ? err.message : null);
+      // The server explains itself in English. Shown as-is in English; in another language the
+      // translated general message reads better than a precise one in the wrong language.
+      setGenErrorMessage(lang === "en" && err instanceof Error ? err.message : null);
       clearPending();
     }
   }
@@ -206,7 +213,7 @@ export function Today() {
   // Waits for preferences too: the demo intro needs to know whether this is the demo, and deciding
   // after the brief has rendered would show content and then snatch it away.
   if (loading || prefsLoading) {
-    return <Centered>Loading your brief…</Centered>;
+    return <Centered>{t.today.loading}</Centered>;
   }
 
   if (showDemoIntro) return <CompilingBrief />;
@@ -256,9 +263,9 @@ export function Today() {
       {showFailure && (
         <div className="mb-5 flex flex-col gap-2.5 rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-3.5">
           <div>
-            <p className="text-[13.5px] font-semibold">That brief didn&rsquo;t come through</p>
+            <p className="text-[13.5px] font-semibold">{t.today.failedTitle}</p>
             <p className="mt-0.5 text-[12.5px] leading-relaxed text-[var(--muted)]">
-              {failureMessage || "Something went wrong while generating it."}
+              {failureMessage || t.today.failedFallback}
             </p>
           </div>
           <div className="flex items-center gap-1">
@@ -266,13 +273,13 @@ export function Today() {
               onClick={() => void generateNow()}
               className="rounded-full bg-[var(--accent)] px-4 py-2 text-[13px] font-semibold text-[var(--on-accent)]"
             >
-              Try again
+              {t.common.tryAgain}
             </button>
             <button
               onClick={() => setErrorDismissed(true)}
               className="px-3 py-2 text-[13px] font-semibold text-[var(--muted)]"
             >
-              Dismiss
+              {t.common.dismiss}
             </button>
           </div>
         </div>
@@ -285,30 +292,28 @@ export function Today() {
         >
           <div className="min-w-0 flex-1">
             <p className="text-[13.5px] font-semibold">
-              This brief is from {formatReportDateInline(brief.date)}
+              {t.today.staleTitle(formatReportDateInline(brief.date, locale))}
             </p>
-            <p className="mt-0.5 text-[12.5px] leading-relaxed text-[var(--muted)]">
-              Today&rsquo;s takes about 3&ndash;4 minutes to write.
-            </p>
+            <p className="mt-0.5 text-[12.5px] leading-relaxed text-[var(--muted)]">{t.today.staleBody}</p>
           </div>
           <button
             onClick={() => void generateNow()}
             className="flex-none rounded-full bg-[var(--accent)] px-4 py-2 text-[13px] font-semibold text-[var(--on-accent)] active:opacity-80"
           >
-            Get today&rsquo;s
+            {t.today.getToday}
           </button>
         </div>
       )}
 
       <span className="text-[12px] font-semibold uppercase tracking-[1.8px] text-[var(--muted)]">
-        {formatReportDate(brief.date)}
+        {formatReportDate(brief.date, locale)}
       </span>
       <h1 className="mt-2 text-[28px] font-bold leading-tight tracking-tight">
-        {greeting()}
+        {greeting(t.greeting)}
         {name ? `, ${name}` : ""}
       </h1>
       <span className="mt-2 block text-[13.5px] text-[var(--muted)]">
-        Your brief · {sections.length} {sections.length === 1 ? "topic" : "topics"} · {minutes} min read
+        {t.today.meta(sections.length, minutes)}
       </span>
 
       {brief.content.recap && (
@@ -327,12 +332,12 @@ export function Today() {
             <PlayIcon />
           </span>
           <span className="flex flex-1 flex-col">
-            <span className="text-[15px] font-semibold">Listen to today's brief</span>
+            <span className="text-[15px] font-semibold">{t.today.listen}</span>
             <span className="text-[12.5px] text-[var(--muted)]">
               {playable.durationSeconds
-                ? `${Math.max(1, Math.round(playable.durationSeconds / 60))} min`
-                : "Audio"}{" "}
-              · AI narration
+                ? t.today.minutes(Math.max(1, Math.round(playable.durationSeconds / 60)))
+                : t.today.audio}{" "}
+              · {t.today.aiNarration}
             </span>
           </span>
           <span className="flex h-[22px] items-end gap-[2.5px]">
@@ -358,8 +363,8 @@ export function Today() {
             </span>
           </span>
           <span className="flex flex-1 flex-col">
-            <span className="text-[15px] font-semibold">Preparing your podcast…</span>
-            <span className="text-[12.5px] text-[var(--muted)]">The audio version is on its way</span>
+            <span className="text-[15px] font-semibold">{t.today.preparing}</span>
+            <span className="text-[12.5px] text-[var(--muted)]">{t.today.onItsWay}</span>
           </span>
         </div>
       ) : canMakePodcast ? (
@@ -373,11 +378,9 @@ export function Today() {
           </span>
           <span className="flex flex-1 flex-col">
             <span className="text-[15px] font-semibold">
-              {episode?.status === "failed" ? "Try the podcast again" : "Make today's podcast"}
+              {episode?.status === "failed" ? t.today.retryPodcast : t.today.makePodcast}
             </span>
-            <span className="text-[12.5px] text-[var(--muted)]">
-              A conversational audio version · takes a couple of minutes
-            </span>
+            <span className="text-[12.5px] text-[var(--muted)]">{t.today.podcastBlurb}</span>
           </span>
         </button>
       ) : null}
@@ -393,11 +396,11 @@ export function Today() {
             <div className="flex items-center gap-2">
               <span className="h-1.5 w-1.5 flex-none rounded-full bg-[var(--accent)]" />
               <span className="text-[11.5px] font-semibold uppercase tracking-[1.4px] text-[var(--muted)]">
-                {s.category ?? "For you"}
+                {s.category ? topicLabel(s.category) : t.today.forYou}
               </span>
               {s.isPrimer && (
                 <span className="rounded-full bg-[var(--accent)]/12 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[var(--accent)]">
-                  New topic
+                  {t.today.newTopic}
                 </span>
               )}
             </div>
@@ -407,7 +410,7 @@ export function Today() {
             </p>
             {s.sources.length > 0 && (
               <span className="text-[12.5px] text-[var(--faint)]">
-                {s.sources.length} {s.sources.length === 1 ? "source" : "sources"}
+                {t.today.sources(s.sources.length)}
               </span>
             )}
           </button>
@@ -424,22 +427,22 @@ export function Today() {
             {
               key: "today-brief",
               target: '[data-tour="topic"]',
-              title: "This is your brief",
-              body: "Each card is a topic you chose, rewritten from today's news. Tap any card to read it in full.",
+              title: t.today.tips.briefTitle,
+              body: t.today.tips.briefBody,
             },
             {
               key: "today-recap",
               target: '[data-tour="recap"]',
               enabled: !!brief.content.recap,
-              title: "While you were away",
-              body: "When you've been away, your brief opens with a quick catch-up on what you missed.",
+              title: t.today.tips.recapTitle,
+              body: t.today.tips.recapBody,
             },
             {
               key: "today-podcast",
               target: '[data-tour="podcast"]',
               enabled: !!playable,
-              title: "Listen, don't just read",
-              body: "Your brief as a conversation — tap to play, or expand it for chapters and speed.",
+              title: t.today.tips.podcastTitle,
+              body: t.today.tips.podcastBody,
             },
           ]}
         />
@@ -455,29 +458,29 @@ function EmptyState({
   deliveryHour: number | undefined;
   onGenerate: () => void;
 }) {
+  const { t, locale } = useLanguage();
   return (
     <Centered>
-      <h1 className="text-[22px] font-bold tracking-tight">You're all set</h1>
+      <h1 className="text-[22px] font-bold tracking-tight">{t.today.emptyTitle}</h1>
       <p className="mt-2 max-w-[280px] text-[14px] leading-relaxed text-[var(--muted)]">
-        Your first brief will land{" "}
         {deliveryHour != null ? (
           <>
-            tomorrow at{" "}
-            <span className="font-semibold text-[var(--ink)]">{formatDeliveryHour(deliveryHour)}</span>
+            {t.today.emptyAtBefore}
+            <span className="font-semibold text-[var(--ink)]">{formatDeliveryHour(deliveryHour, locale)}</span>
           </>
         ) : (
-          "tomorrow morning"
+          t.today.emptyMorning
         )}
-        . Want to see it now?
+        {t.today.emptyAfter}
       </p>
       <button
         onClick={onGenerate}
         data-tour="generate"
         className="mt-5 rounded-full bg-[var(--accent)] px-5 py-2.5 text-[14.5px] font-semibold text-[var(--on-accent)] shadow-[0_4px_12px_rgba(192,81,43,0.32)] active:opacity-80"
       >
-        Generate today's brief
+        {t.today.generate}
       </button>
-      <p className="mt-3 text-[12px] text-[var(--faint)]">Takes about 3–4 minutes.</p>
+      <p className="mt-3 text-[12px] text-[var(--faint)]">{t.today.takes}</p>
     </Centered>
   );
 }
@@ -502,8 +505,9 @@ function MicIcon() {
 }
 
 function LoadingBars() {
+  const t = useLanguage().t;
   return (
-    <div className="flex h-8 items-end gap-[3.5px]" role="status" aria-label="Compiling">
+    <div className="flex h-8 items-end gap-[3.5px]" role="status" aria-label={t.today.compilingAria}>
       {[0, 1, 2, 3, 4].map((i) => (
         <span
           key={i}
@@ -516,30 +520,31 @@ function LoadingBars() {
 }
 
 function CompilingBrief() {
+  const t = useLanguage().t;
   return (
     <Centered>
       <LoadingBars />
-      <h1 className="mt-5 text-[22px] font-bold tracking-tight">Compiling your brief…</h1>
+      <h1 className="mt-5 text-[22px] font-bold tracking-tight">{t.today.compilingTitle}</h1>
       <p className="mt-2 max-w-[280px] text-[14px] leading-relaxed text-[var(--muted)]">
-        Gathering today's news and writing it up — this usually takes about 3–4 minutes, and it'll
-        appear here on its own. You can leave this screen; it'll be here when you're back.
+        {t.today.compilingBody}
       </p>
     </Centered>
   );
 }
 
 function GenerateError({ onRetry, message }: { onRetry: () => void; message?: string | null }) {
+  const t = useLanguage().t;
   return (
     <Centered>
-      <h1 className="text-[22px] font-bold tracking-tight">That didn't come through</h1>
+      <h1 className="text-[22px] font-bold tracking-tight">{t.today.errorTitle}</h1>
       <p className="mt-2 max-w-[280px] text-[14px] leading-relaxed text-[var(--muted)]">
-        {message || "Your brief didn't finish generating — it may have stalled. Give it another go."}
+        {message || t.today.errorFallback}
       </p>
       <button
         onClick={onRetry}
         className="mt-5 rounded-full bg-[var(--accent)] px-5 py-2.5 text-[14.5px] font-semibold text-[var(--on-accent)] shadow-[0_4px_12px_rgba(192,81,43,0.32)] active:opacity-80"
       >
-        Try again
+        {t.common.tryAgain}
       </button>
     </Centered>
   );

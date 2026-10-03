@@ -22,6 +22,7 @@ Applied in order. `0001`–`0003` are the foundation; the rest are features as t
 | `0013_subscriptions` | Tier and status. Modelled, not charged — there is no checkout |
 | `0014_is_demo` | Marks the public demo account, which every paid endpoint checks |
 | `0015_pipeline_usage` | One row per paid API call — tokens, requests, duration and an estimated cost — plus the `pipeline_usage_by_brief` view that sums them per brief |
+| `0016_language` | The reader's language (English or Spain Spanish), and display labels for live-suggested topics, whose internal names stay English |
 
 ## Design decisions baked into the schema
 

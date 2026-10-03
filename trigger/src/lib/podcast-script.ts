@@ -1,6 +1,8 @@
 import { anthropic, MODELS, firstText } from "./anthropic";
 import { anthropicUsage, noMeter, type Meter } from "./usage";
 import type { DialogueTurn } from "./openai-tts";
+import { LANGUAGE_NAME } from "./language";
+import type { Language } from "@shared/types";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Podcast script — DESIGNED WITH THE OWNER. Pure LLM logic (no Trigger/DB/TTS deps) so it
@@ -83,6 +85,7 @@ export async function writeScript(
   sections: { heading: string; isPrimer: boolean }[] = [],
   recap?: string,
   meter: Meter = noMeter,
+  language: Language = "en",
 ): Promise<DialogueTurn[]> {
   const sectionList =
     sections.length > 0
@@ -101,6 +104,17 @@ export async function writeScript(
     budget / WORDS_PER_MINUTE,
   )} minutes spoken.`;
 
+  // The style notes in the system prompt are written for English and give English examples. For any
+  // other language they are a guide to the register, not phrases to translate. See lib/language.ts.
+  const languageNote =
+    language === "en"
+      ? ""
+      : `\n\nLanguage: write the whole script in ${LANGUAGE_NAME[language]} — natural, everyday ` +
+        `peninsular Spanish, as two people from Spain would actually talk, using tú. The style notes ` +
+        `give English examples ("Right.", "Okay, so—"); use what a Spanish speaker would really say ` +
+        `instead ("Vale.", "A ver, entonces…", "¿En serio?"), never a literal translation. Say outlet ` +
+        `names as they are.`;
+
   const message = await anthropic().messages.create({
     model: MODELS.podcastScript,
     max_tokens: 8000,
@@ -112,7 +126,7 @@ export async function writeScript(
     messages: [
       {
         role: "user",
-        content: `Here is today's report. Write the two-person interview script.\n\n${markdown}${sectionList}${recapBlock}${lengthNote}`,
+        content: `Here is today's report. Write the two-person interview script.\n\n${markdown}${sectionList}${recapBlock}${lengthNote}${languageNote}`,
       },
     ],
   });
@@ -128,6 +142,7 @@ export async function writeScript(
       with_recap: Boolean(recap),
       effort: "medium",
       word_budget: budget,
+      language,
     },
   });
 

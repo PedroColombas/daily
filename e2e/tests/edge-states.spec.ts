@@ -92,6 +92,37 @@ test.describe("states that cannot be reached by clicking", () => {
   });
 });
 
+test.describe("a reader in Spanish", () => {
+  test("gets the whole app in Spanish, with topic names translated", async ({ page }) => {
+    // Nothing may be written from here: this signs in as the demo but tells the app it is an
+    // ordinary Spanish reader, and an ordinary reader's screens save things. So every write is
+    // refused before it leaves the browser — reads only.
+    await page.route("**/rest/v1/**", (route) =>
+      route.request().method() === "GET" ? route.fallback() : route.abort(),
+    );
+    await page.route("**/rest/v1/preferences*", async (route) => {
+      if (route.request().method() !== "GET") return route.abort();
+      const res = await route.fetch();
+      const rows = (await res.json()) as Record<string, unknown>[];
+      const patched = rows.map((r) => ({ ...r, language: "es", is_demo: false }));
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(patched) });
+    });
+    await stubTable(page, "reports", [COMPLETE_REPORT]);
+    await stubTable(page, "podcast_episodes", []);
+    await enterDemo(page);
+
+    await expect(page.locator('[data-tour="topic"]')).toBeVisible();
+    await expect(page.locator("html")).toHaveAttribute("lang", "es");
+    await expect(page.getByRole("link", { name: "Hoy" })).toBeVisible();
+    await expect(page.getByText(/min de lectura/)).toBeVisible();
+    // The section's genre is stored as "Technology" and shown in the reader's language.
+    await expect(page.locator('[data-tour="topic"]').getByText("Tecnología")).toBeVisible();
+
+    await page.getByRole("link", { name: "Ajustes" }).click();
+    await expect(page.getByRole("button", { name: "Español" })).toHaveAttribute("aria-pressed", "true");
+  });
+});
+
 test.describe("awkward content", () => {
   test("a very long custom interest does not break the layout", async ({ page }) => {
     const monster = "what a specific person is doing about ".repeat(12) + "semiconductors";
