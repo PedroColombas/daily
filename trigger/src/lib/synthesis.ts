@@ -1,6 +1,6 @@
 import { anthropic, MODELS, firstText } from "./anthropic";
 import { anthropicUsage, noMeter, type Meter } from "./usage";
-import type { Preferences, ReportContent, ReportSection } from "@shared/types";
+import type { Language, Preferences, ReportContent, ReportSection } from "@shared/types";
 import type { FetchedTopic } from "../jobs/fetch-news";
 import { LANGUAGE_NAME, readerLanguage } from "./language";
 
@@ -22,7 +22,7 @@ import { LANGUAGE_NAME, readerLanguage } from "./language";
 // day never lands inside the five-minute window), and this prompt is ~5% of what synthesis reads,
 // so even a perfect hit rate would save almost nothing.
 // (Opus only caches a prefix once it's >=4096 tokens; below that this silently no-ops.)
-const SYNTHESIS_SYSTEM = `You are the synthesis engine for a personalised daily news briefing. You receive pre-fetched, per-topic research and turn it into a single report.
+export const SYNTHESIS_SYSTEM = `You are the synthesis engine for a personalised daily news briefing. You receive pre-fetched, per-topic research and turn it into a single report.
 
 STRUCTURE: For each topic, write a short heading then 2-3 tight paragraphs covering what happened, the key facts, and why it matters.
 
@@ -40,7 +40,7 @@ CATCH-UP PRIMERS: Topics marked "primer": true are ones the reader is following 
 
 OUTPUT: Return JSON matching the schema - a "sections" array, one entry per topic you include, each with "topic_index" (the index of the topic in the input array it is based on), a "heading", and a "summary". Do NOT emit a full markdown document or source lists - the report layout and citations are assembled in code.`;
 
-const SYNTHESIS_SCHEMA = {
+export const SYNTHESIS_SCHEMA = {
   type: "object",
   properties: {
     sections: {
@@ -71,12 +71,14 @@ interface SynthesisOutput {
   sections: { topic_index: number; heading: string; summary: string }[];
 }
 
-export async function synthesize(
+// The user turn for a brief. Exported, with SYNTHESIS_SYSTEM / SYNTHESIS_SCHEMA and
+// finishSynthesis, so the model bake-off (scripts/bakeoff.ts) sends every candidate exactly what
+// production sends and judges the reply by the same guard.
+export function synthesisUserMessage(
   prefs: Preferences,
   topics: FetchedTopic[],
-  meter: Meter = noMeter,
-): Promise<{ content: ReportContent; markdown: string }> {
-  // Per-user, volatile content goes in the user turn — after the cached system prefix.
+): { userMessage: string; language: Language } {
+  // Per-user, volatile content goes in the user turn, after the static system prompt.
   const topicsForModel = topics.map((t, index) => ({
     index,
     topic: t.topic,
@@ -109,6 +111,15 @@ export async function synthesize(
     `${JSON.stringify(topicsForModel)}\n\n` +
     "Write the report now.";
 
+  return { userMessage, language };
+}
+
+export async function synthesize(
+  prefs: Preferences,
+  topics: FetchedTopic[],
+  meter: Meter = noMeter,
+): Promise<{ content: ReportContent; markdown: string }> {
+  const { userMessage, language } = synthesisUserMessage(prefs, topics);
   const model = MODELS.synthesis;
   const started = Date.now();
 
@@ -146,12 +157,22 @@ export async function synthesize(
     },
   });
 
+  return finishSynthesis(firstText(message.content), message.stop_reason === "max_tokens", topics, language);
+}
+
+// Turn the model's reply into the report: parse it, re-attach the real sources, and reject a
+// degraded one. Throws on anything not fit to ship (Trigger then retries).
+export function finishSynthesis(
+  raw: string,
+  truncated: boolean,
+  topics: FetchedTopic[],
+  language: Language,
+): { content: ReportContent; markdown: string } {
   // A truncated (max_tokens) or text-less response would fail JSON.parse with a cryptic
   // "Unexpected end of JSON input" — surface a clear, diagnosable error instead (Trigger retries).
-  const raw = firstText(message.content);
-  if (message.stop_reason === "max_tokens" || !raw.trim()) {
+  if (truncated || !raw.trim()) {
     throw new Error(
-      `Synthesis returned no usable JSON (stop_reason=${message.stop_reason}, text length=${raw.length}). ` +
+      `Synthesis returned no usable JSON (truncated=${truncated}, text length=${raw.length}). ` +
         "Likely truncated — the brief may have too many/too-long sections for the token budget.",
     );
   }
@@ -193,7 +214,7 @@ export async function synthesize(
 }
 
 // "https://www.reuters.com/world/…" -> "reuters.com". Falls back to the raw string if it isn't a URL.
-function outletOf(url: string): string {
+export function outletOf(url: string): string {
   try {
     return new URL(url).hostname.replace(/^www\./, "");
   } catch {

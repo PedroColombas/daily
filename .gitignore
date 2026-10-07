@@ -44,3 +44,6 @@ e2e/.auth/
 /*.dc.html
 /*.pdf
 /Landing Page/
+
+# Model bake-off output (scripts/bakeoff.ts): real research and model replies, kept local
+trigger/bakeoff-out/
