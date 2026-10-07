@@ -49,6 +49,13 @@ async function enterDemo(page: Page): Promise<void> {
   await page.getByRole("button", { name: /view the demo/i }).click();
 }
 
+// Every test here intercepts requests. One still in flight when its test ends would otherwise throw
+// "route.fetch: Test ended" into whichever test runs next in that worker — a failure blamed on an
+// unrelated test, which then knocks out the one after it too.
+test.afterEach(async ({ page }) => {
+  await page.unrouteAll({ behavior: "ignoreErrors" });
+});
+
 test.describe("states that cannot be reached by clicking", () => {
   test("a brief still being written shows the compiling screen", async ({ page }) => {
     await stubTable(page, "reports", [{ ...COMPLETE_REPORT, status: "generating", content: null, markdown: null }]);
