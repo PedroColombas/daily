@@ -193,13 +193,21 @@ export function Today() {
 
   // Explicit, user-initiated podcast generation — never automatic, since audio is the most
   // expensive step in the pipeline.
+  //
+  // A ref, not state, guards against a second tap: state only changes on the next render, so a
+  // quick double tap reads the old value twice and asks twice. That happened on 2026-10-05 and paid
+  // for the whole episode — script and speech — two times over. The server refuses duplicates too.
+  const podcastRequested = useRef(false);
   async function makePodcast() {
-    if (!brief) return;
+    if (!brief || podcastRequested.current) return;
+    podcastRequested.current = true;
     setPodcastStarting(true);
     try {
       await requestPodcast(brief.id);
     } catch {
       setPodcastStarting(false);
+    } finally {
+      podcastRequested.current = false;
     }
   }
 

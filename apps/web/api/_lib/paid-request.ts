@@ -66,6 +66,23 @@ export async function authorisePaidRequest(
   return { userId: user.id, token, supabaseUrl, anonKey };
 }
 
+// The report's podcast episode, if one exists, looked up AS THE CALLER (RLS: their own only).
+export async function fetchOwnEpisode(
+  auth: PaidRequestAuth,
+  reportId: string,
+): Promise<{ status: string; created_at: string } | null | "error"> {
+  const res = await fetch(
+    `${auth.supabaseUrl}/rest/v1/podcast_episodes?report_id=eq.${encodeURIComponent(reportId)}&select=status,created_at`,
+    { headers: authHeaders(auth.anonKey as string, auth.token as string) },
+  );
+  if (!res.ok) {
+    console.error("episode lookup failed:", res.status, await res.text());
+    return "error";
+  }
+  const rows = (await res.json()) as { status: string; created_at: string }[];
+  return rows?.[0] ?? null;
+}
+
 // Look a report up AS THE CALLER, so RLS proves ownership: someone else's id simply returns
 // nothing, whatever id was posted.
 export async function fetchOwnReport(
