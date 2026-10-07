@@ -11,6 +11,7 @@
 //   npx tsx scripts/bakeoff.ts                      everything
 //   npx tsx scripts/bakeoff.ts --only=glm,qwen      some candidates (results merge into earlier ones)
 //   npx tsx scripts/bakeoff.ts --brief=C            one brief
+//   npx tsx scripts/bakeoff.ts --page-only          rebuild report.html from saved results, no calls
 //
 // Keys come from trigger/.env (SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, OPENROUTER_API_KEY) and,
 // for ANTHROPIC_API_KEY, ../apps/web/.env.local if it is not in trigger/.env. Never printed.
@@ -325,6 +326,11 @@ const OUT_DIR = "bakeoff-out";
 const RESULTS = `${OUT_DIR}/results.json`;
 
 async function main() {
+  if (process.argv.includes("--page-only")) {
+    writeFileSync(`${OUT_DIR}/report.html`, renderReport(JSON.parse(readFileSync(RESULTS, "utf8"))));
+    console.log(`Wrote ${OUT_DIR}/report.html (from saved results)`);
+    return;
+  }
   const arg = (name: string) => process.argv.find((a) => a.startsWith(`--${name}=`))?.split("=")[1]?.split(",");
   const only = arg("only");
   const briefIds = arg("brief");
@@ -454,7 +460,7 @@ table{border-collapse:collapse;margin-top:16px;font-size:14px}td,th{border-botto
 #summary{display:none}body.revealed #summary{display:block}
 </style></head><body><main>
 <h1>Model bake-off — report writing</h1>
-<p class="lede">Each brief was written by every model from the same research, with production's prompt. Reports are shuffled and unnamed. Score each one, then reveal which model wrote it. Scores are kept in this browser only.</p>
+<p class="lede">Each brief was written by every model from the same research, with production's prompt. Reports are shuffled and unnamed. Score each one from <strong>1 (worst) to 5 (best)</strong> on how good a brief it is to read: accurate, clear, each topic its own story, sources named. Then reveal which model wrote it. Scores are kept in this browser only.</p>
 <button id="reveal">Reveal models</button>
 <div id="summary"><table><thead><tr><th>Model</th><th>Passed</th><th>Avg cost / brief</th><th>Avg time</th><th>Your avg score</th></tr></thead><tbody>${summaryRows}</tbody></table></div>
 ${briefsHtml}
