@@ -2,6 +2,7 @@ import type { SubtopicMap } from "@shared/types";
 import { Chip } from "../ui/Chip";
 import { useSubtopicSuggestions } from "../../hooks/useSubtopicSuggestions";
 import { useLanguage, useTopicLabel } from "../../i18n/LanguageProvider";
+import { capitalFirst } from "../../i18n/topics";
 
 // Per-genre suggestion chips. Renders the union of fetched suggestions + already-selected
 // subtopics, so a previously-picked subtopic always stays visible and toggleable.
@@ -20,7 +21,7 @@ export function SubtopicPicker({
   const { suggestions, labels: liveLabels, loading } = useSubtopicSuggestions(genres, lang);
   const stored = useTopicLabel(labels);
   // Today's suggestion labels first (they came with the chip), then anything already stored.
-  const label = (name: string) => liveLabels[name] ?? stored(name);
+  const label = (name: string) => (liveLabels[name] ? capitalFirst(liveLabels[name]) : stored(name));
 
   if (genres.length === 0) {
     return <p className="text-[13px] text-[var(--muted)]">{t.topics.pickGenreFirst}</p>;

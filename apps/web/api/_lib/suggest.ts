@@ -43,7 +43,7 @@ const LABELLED_SCHEMA = {
 const SPANISH_LABELS =
   `\n\nThe reader reads in Spanish (Spain). For each subtopic give "name" — the English label, ` +
   `following the rules above — and "label": how a newspaper in Spain would name that same section ` +
-  `(sentence case, as short as the English).`;
+  `(sentence case — capital first letter — and as short as the English).`;
 
 const SYSTEM = `You suggest subtopics a news reader can follow within a broad news genre.
 Favour DURABLE THEMES that are currently prominent in the news — ongoing areas of development and active storylines — NOT one-off events or dated headlines. A good subtopic still makes sense a month from now (e.g. "AI Regulation", not "Tuesday's Senate vote").
@@ -140,7 +140,9 @@ async function distillThemes(
   const labels: Record<string, string> = {};
   for (const item of items as { name?: unknown; label?: unknown }[]) {
     if (typeof item?.name === "string" && typeof item.label === "string" && item.label.trim()) {
-      labels[item.name.trim()] = item.label.trim();
+      // First letter capitalised: the model sometimes returns Spanish labels all in lower case.
+      const label = item.label.trim();
+      labels[item.name.trim()] = label.charAt(0).toLocaleUpperCase("es") + label.slice(1);
     }
   }
   const subtopics = cleanList(

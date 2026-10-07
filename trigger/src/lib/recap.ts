@@ -49,6 +49,6 @@ export async function writeRecap(
   // Defensive: drop a leading title/heading line the model may still add (the card has its own).
   return firstText(message.content)
     .trim()
-    .replace(/^\s*(#{1,6}\s+[^\n]*|[^\n]*(while you were away|mientras no estabas)[^\n]*)\n+/i, "")
+    .replace(/^\s*(#{1,6}\s+[^\n]*|[^\n]*(while you were away|mientras no estabas|lo que te has perdido)[^\n]*)\n+/i, "")
     .trim();
 }

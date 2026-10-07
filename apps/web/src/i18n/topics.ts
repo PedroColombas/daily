@@ -92,5 +92,12 @@ export function topicLabel(
   labels?: Record<string, string> | null,
 ): string {
   if (lang === "en") return name;
-  return labels?.[name] ?? ES[name] ?? name;
+  return capitalFirst(labels?.[name] ?? ES[name] ?? name);
+}
+
+// Topic names always start with a capital — "Regulación de la IA", never "regulación de la IA".
+// Live-suggested labels sometimes come back all lower case, so this is applied wherever a topic is
+// shown rather than trusted to the model; it also fixes labels already stored or cached.
+export function capitalFirst(text: string): string {
+  return text.charAt(0).toLocaleUpperCase("es") + text.slice(1);
 }

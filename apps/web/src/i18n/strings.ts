@@ -305,7 +305,7 @@ const es: Strings = {
   welcome: {
     title: "Te damos la bienvenida a",
     blurb:
-      "Todas las noticias que te importan, cada día: recopiladas, resumidas y adaptadas exactamente a ti.",
+      "Todas las noticias que te importan, cada día, recopiladas, resumidas y adaptadas exactamente a lo que a ti te interesa.",
     start: "Empezar",
     time: "Se configura en un minuto.",
   },
@@ -395,7 +395,7 @@ const es: Strings = {
       briefTitle: "Este es tu resumen",
       briefBody:
         "Cada tarjeta es un tema que elegiste, redactado a partir de las noticias de hoy. Toca una para leerla entera.",
-      recapTitle: "Mientras no estabas",
+      recapTitle: "Lo que te has perdido",
       recapBody: "Si has estado fuera, tu resumen empieza poniéndote al día de lo que te perdiste.",
       podcastTitle: "Escúchalo, no solo lo leas",
       podcastBody: "Tu resumen como una conversación: toca para reproducir, o ábrelo para ver capítulos y velocidad.",
@@ -403,7 +403,7 @@ const es: Strings = {
   },
 
   recap: {
-    title: "Mientras no estabas",
+    title: "Lo que te has perdido",
     days: (n: number) => plural(n, "día", "días"),
     less: "Ver menos",
     more: "Leer más",

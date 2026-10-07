@@ -6,7 +6,7 @@ import { Logo } from "./Logo";
 // other one first.
 const OPTIONS: { value: Language; name: string; detail: string }[] = [
   { value: "en", name: "English", detail: "Briefs and podcasts in English" },
-  { value: "es", name: "Español", detail: "Resúmenes y podcasts en español de España" },
+  { value: "es", name: "Español", detail: "Resúmenes y podcasts en castellano" },
 ];
 
 // The very first screen, before the welcome and the wizard: everything after it — the app, the
