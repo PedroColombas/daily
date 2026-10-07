@@ -397,11 +397,25 @@ function shuffled<T>(items: T[], seed: string): T[] {
   return out;
 }
 
+// Briefs whose order has been seen (the owner revealed the models before scoring them) get a fresh
+// order in which every report has moved — so the old positions give nothing away either.
+const RESHUFFLED = new Set(["B", "C"]);
+
+function orderFor<T extends { candidate: string }>(rows: T[], briefId: string): T[] {
+  const first = shuffled(rows, briefId);
+  if (!RESHUFFLED.has(briefId)) return first;
+  for (let round = 1; round < 500; round++) {
+    const next = shuffled(rows, `${briefId}:${round}`);
+    if (next.every((r, i) => r.candidate !== first[i].candidate)) return next;
+  }
+  return first;
+}
+
 function renderReport(all: Result[]): string {
   const label = (id: string) => CANDIDATES.find((c) => c.id === id)?.label ?? id;
   const briefsHtml = BRIEFS.filter((b) => all.some((r) => r.brief === b.id))
     .map((b) => {
-      const rows = shuffled(all.filter((r) => r.brief === b.id), b.id);
+      const rows = orderFor(all.filter((r) => r.brief === b.id), b.id);
       const cards = rows
         .map((r, i) => {
           const n = i + 1;
